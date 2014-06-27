@@ -17,7 +17,7 @@ data Type
   | TFloat
   | TDouble
   | TComplex Type
-  | TCustom String                -- ^ For enumerations.
+  | TEnum String
   | TDummy Int                    -- ^ Used for extracting the bound variables
   deriving (Eq, Show)
 
@@ -63,10 +63,14 @@ data HType
     } deriving Show
 
 mkParamType :: HType -> String
-mkParamType (HType m s _) = printf "%s `%s'" m s
+mkParamType (HType m s _) =
+  if null m then s' else m ++ " " ++ s'
+  where s' = "`" ++ s ++ "'"
 
 mkRetType :: HType -> String
-mkRetType (HType _ s m) = printf "`%s' %s" s m
+mkRetType (HType _ s m) =
+  if null m then s' else s' ++ " " ++ m
+  where s' = "`" ++ s ++ "'"
 
 -- | Represents a C function hook for c2hs.
 data CFun
@@ -111,7 +115,7 @@ decorate [a, b] | a == b    = substitute $ typeAbbrev a
 convType t = case t of
   TVoid            -> simple "()"
   TSize            -> simple "Int"      -- c2hs doesn't understand "size_t"
-  TCustom t'       -> enum t'
+  TEnum t'         -> enum t'
   TFloat           -> floating "Float"
   TDouble          -> floating "Double"
   TComplex TFloat  -> complex "Complex Float"
@@ -134,7 +138,7 @@ prettyType dummyNames = pretty 0
   where pretty p t = case t of
           TVoid       -> "()"
           TSize       -> "Int"
-          TCustom t'  -> t'
+          TEnum t'    -> t'
           TFloat      -> "Float"
           TDouble     -> "Double"
           TComplex t' -> parensIf (p >= 10) $ "Complex " ++ pretty 10 t'
@@ -152,23 +156,15 @@ float     = TFloat
 double    = TDouble
 complex   = TComplex
 index     = TSize
-order     = TCustom "Order"
-transpose = TCustom "Transpose"
-uplo      = TCustom "Uplo"
-diag      = TCustom "Diag"
-side      = TCustom "Side"
+order     = TEnum "Order"
+transpose = TEnum "Transpose"
+uplo      = TEnum "Uplo"
+diag      = TEnum "Diag"
+side      = TEnum "Side"
 
 funInstsUnsafe = fmap (\ x -> x { cfSafe = False }) funInsts
 
 funInsts = fmap mangleFun $ concatFunInstances funs
-
-customDefs = [("nrm2", "Complex Float",  "scnrm2"),
-              ("nrm2", "Complex Double", "dznrm2")]
-
-customTypes =
-  [ ("nrm2", gp1 $ \ a -> fun "nrm2" [ int, ptr a, int, a ])
-  , ("asum", gp1 $ \ a -> fun "asum" [ int, ptr a, int, a ])
-  ]
 
 -- | Blas function signatures.
 funs =
@@ -381,5 +377,3 @@ class1 =
     if length (fiArgs . head $ gpInsts f) == 1
       then return $ printf "%s :: %s" (gpName f) typeSignature
       else []
-
---instances1 = Instance (csName class1)

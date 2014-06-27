@@ -32,7 +32,8 @@ ffiModule name doc imports exports contents =
                 , "Data.Complex (Complex)"
                 , "FFI" ] ++ imports
   , mExports  = exports
-  , mContents = [ sysIncl "cblas.h" ] ++ contents
+  , mContents = [ sysIncl "cblas.h" ]
+             ++ fmap ("\n" ++) contents
   }
 
 ffiEnumModule name enums doc =
@@ -63,17 +64,18 @@ main = do
 -- | Generates a c2hs hook for the enumeration.
 mkEnum :: String -> String
 mkEnum name =
-  printf ("{# enum %s as %s {} with prefix = \"%s\" " ++
-          "deriving (Eq, Read, Show) #}\n\n")
-         (enumMangler name) name enumValuePrefix
+  printf ("{# enum %s as %s {} with prefix = \"%s\"%s #}\n")
+         (enumMangler name) name enumValuePrefix derivings
+  where derivings = " deriving (Eq, Read, Show)"
 
 -- | Generates a c2hs hook for the function.
 mkFun :: CFun -> String
 mkFun (CFun safe name params ret doc) =
   (if null doc then "" else "-- | " ++ doc) ++
-  printf "{# fun %s %s as %s { %s } -> %s #}\n\n"
-         safe' cName name params' ret'
+  printf "{# fun%s %s%s { %s } -> %s #}\n"
+         safe' cName hName params' ret'
   where cName   = funMangler name
-        safe'   = if safe then "" else "unsafe"
-        params' = intercalate " , " $ fmap (mkParamType . convType) params
+        hName   = if name == cName then "" else " as " ++ name
+        safe'   = if safe then "" else " unsafe"
+        params' = intercalate ", " $ fmap (mkParamType . convType) params
         ret'    = mkRetType $ convType ret

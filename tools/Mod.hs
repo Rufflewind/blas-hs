@@ -31,11 +31,14 @@ mkHeader :: Module -> [String]
 mkHeader m =
   fmap (printf "{-# LANGUAGE %s #-}\n" . intercalate ", ")
        (allOrNothing $ mExts m)
-  ++ [ printf "{-|\nModule: %s\n%s\n-}" (mName m) (mDoc m)
+  ++ [ "{- This file is auto-generated.  Do not edit directly. -}\n"
+     , printf "{-|\nModule: %s\n%s\n-}\n" (mName m) (mDoc m)
      , printf "module %s (%s) where\n" (mName m) $
               intercalate ", " $  mExports  m ]
   ++ fmap (printf "import %s\n") (mImports  m)
 
 -- | Construct the module.
 mkModule :: Module -> String
-mkModule m = concat $ mkHeader m ++ mContents m
+mkModule m = concat $ mkHeader m
+          ++ if null contents then [] else "\n" : contents
+  where contents = mContents m

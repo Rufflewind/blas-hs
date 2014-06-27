@@ -1,0 +1,30 @@
+#!/usr/bin/env runhaskell
+-- -*- haskell -*-
+-- This script is not used for anything right now.
+{-# LANGUAGE NoMonomorphismRestriction #-}
+module Main where
+import Data.List (intercalate)
+import Text.Printf (printf)
+import Mod
+import Defs
+
+main :: IO ()
+main =
+  putStr . mkModule $ Module
+    { mName     = "BlasClasses"
+    , mExts     = []
+    , mImports  = [ "Data.Complex (Complex)"
+                  , "Foreign.Ptr (Ptr)"
+                  , printf "BlasFFI (%s)" $ intercalate ", " enumNames
+                  , "qualified BlasFFI as C" ]
+    , mExports  = [ "module BlasClasses" ]
+    , mContents = fmap mkClass [class1]
+    , mDoc      = ""
+    }
+
+mkDoc doc = if null doc then "" else printf "-- | %s\n" doc
+
+mkClass cs =
+  printf "%sclass %s%s where%s\n" (mkDoc $ csDoc cs) (csName cs) pars defs
+  where pars = concat . fmap (' ' :)     $ csParamNames cs
+        defs = concat . fmap ("\n  " ++) $ csDefs cs
