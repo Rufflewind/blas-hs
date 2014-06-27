@@ -1,0 +1,79 @@
+#!/usr/bin/env runhaskell
+-- -*- haskell -*-
+--
+-- Blas FFI interface generator
+-- ============================
+--
+-- This script generates an input file for c2hs, which generates a low-level
+-- FFI interface to CBlas.
+--
+{-# LANGUAGE NoMonomorphismRestriction #-}
+module Main where
+import Data.List (intercalate)
+import Text.Printf (printf)
+import Mod
+import Defs
+
+moduleDoc stability body =
+  intercalate "\n"
+  [ "Copyright: (c) 2014 Phil Ruffwind"
+  , "License: MIT"
+  , "Maintainer: rf@rufflewind.com"
+  , "Stability: " ++ stability
+  , body ]
+
+ffiModule name doc imports exports contents =
+  mkModule $ Module
+  { mName     = name
+  , mExts     = [ "ForeignFunctionInterface" ]
+  , mDoc      = doc
+  , mImports  = [ "Prelude hiding (Either(Left, Right))"
+                , "Foreign.Storable.Complex ()"
+                , "Data.Complex (Complex)"
+                , "FFI" ] ++ imports
+  , mExports  = exports
+  , mContents = [ sysIncl "cblas.h" ] ++ contents
+  }
+
+ffiEnumModule name enums doc =
+  ffiModule name doc []
+  (fmap (++ "(..)") enums)
+  (fmap mkEnum enums)
+
+ffiFunModule name functions doc =
+  ffiModule name doc ["Blas.Primitive.Types"]
+  (fmap cfName functions)
+  (fmap mkFun functions)
+
+main :: IO ()
+main = do
+  writeFile "../src/Blas/Primitive/Types.chs" .
+    ffiEnumModule "Blas.Primitive.Types" enumNames $ moduleDoc
+    "experimental"
+    "Enumerations used by the Blas interface."
+  writeFile "../src/Blas/Primitive/Safe.chs" .
+    ffiFunModule "Blas.Primitive.Safe" funInsts $ moduleDoc
+    "experimental"
+    "Foreign function interface to Blas.  These functions use safe foreign calls, which do not block other Haskell threads."
+  writeFile "../src/Blas/Primitive/Unsafe.chs" .
+    ffiFunModule "Blas.Primitive.Unsafe" funInstsUnsafe $ moduleDoc
+    "experimental"
+    "Foreign function interface to Blas.  These functions use unsafe foreign calls, which have a lower overhead."
+
+-- | Generates a c2hs hook for the enumeration.
+mkEnum :: String -> String
+mkEnum name =
+  printf ("{# enum %s as %s {} with prefix = \"%s\" " ++
+          "deriving (Eq, Read, Show) #}\n\n")
+         (enumMangler name) name enumValuePrefix
+
+-- | Generates a c2hs hook for the function.
+mkFun :: CFun -> String
+mkFun (CFun safe name params ret doc) =
+  (if null doc then "" else "-- | " ++ doc) ++
+  printf "{# fun %s %s as %s { %s } -> %s #}\n\n"
+         safe' cName name params' ret'
+  where cName   = funMangler name
+        safe'   = if safe then "" else "unsafe"
+        params' = intercalate " , " $ fmap (mkParamType . convType) params
+        ret'    = mkRetType $ convType ret
