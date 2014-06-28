@@ -10,8 +10,8 @@ Foreign function interface to Blas.  These functions use safe foreign calls, whi
 -}
 module Blas.Primitive.Safe (sdsdot, dsdot, sdot, ddot, cdotu_sub, zdotu_sub, cdotc_sub, zdotc_sub, snrm2, dnrm2, scnrm2, dznrm2, sasum, dasum, scasum, dzasum, isamax, idamax, icamax, izamax, sswap, dswap, cswap, zswap, scopy, dcopy, ccopy, zcopy, saxpy, daxpy, caxpy, zaxpy, srotg, drotg, srotmg, drotmg, srot, drot, srotm, drotm, sscal, dscal, cscal, csscal, zscal, zdscal, sgemv, dgemv, cgemv, zgemv, sgbmv, dgbmv, cgbmv, zgbmv, strmv, dtrmv, ctrmv, ztrmv, stbmv, dtbmv, ctbmv, ztbmv, stpmv, dtpmv, ctpmv, ztpmv, strsv, dtrsv, ctrsv, ztrsv, stbsv, dtbsv, ctbsv, ztbsv, stpsv, dtpsv, ctpsv, ztpsv, ssymv, dsymv, ssbmv, dsbmv, sspmv, dspmv, sger, dger, ssyr, dsyr, ssyr2, dsyr2, sspr, dspr, sspr2, dspr2, chemv, zhemv, chbmv, zhbmv, chpmv, zhpmv, cgeru, zgeru, cgerc, zgerc, cher, zher, chpr, zhpr, cher2, zher2, chpr2, zhpr2, sgemm, dgemm, cgemm, zgemm, ssymm, dsymm, csymm, zsymm, ssyrk, dsyrk, csyrk, zsyrk, ssyr2k, dsyr2k, csyr2k, zsyr2k, chemm, zhemm, cherk, zherk, cher2k, zher2k, strmm, dtrmm, ctrmm, ztrmm, strsm, dtrsm, ctrsm, ztrsm) where
 import Prelude hiding (Either(Left, Right))
-import Foreign.Storable.Complex ()
 import Data.Complex (Complex)
+import Foreign.Storable.Complex ()
 import Blas.Primitive.Types
 import FFI
 

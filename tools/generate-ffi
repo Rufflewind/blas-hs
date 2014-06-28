@@ -27,8 +27,7 @@ ffiModule name doc imports exports contents =
   { mName     = name
   , mExts     = [ "ForeignFunctionInterface" ]
   , mDoc      = doc
-  , mImports  = [ "Prelude hiding (Either(Left, Right))"
-                , "Foreign.Storable.Complex ()"] ++ imports
+  , mImports  = "Prelude hiding (Either(Left, Right))" : imports
   , mExports  = exports
   , mContents = [ sysIncl "cblas.h" ]
              ++ fmap ("\n" ++) contents
@@ -41,7 +40,8 @@ ffiEnumModule name enums doc =
 
 ffiFunModule name functions doc =
   ffiModule name doc
-  ["Data.Complex (Complex)"
+  [ "Data.Complex (Complex)"
+  , "Foreign.Storable.Complex ()"
   , "Blas.Primitive.Types"
   , "FFI" ]
   (fmap cfName functions)
@@ -49,10 +49,6 @@ ffiFunModule name functions doc =
 
 main :: IO ()
 main = do
-  writeFile "../src/Blas/Primitive/Types.chs" .
-    ffiEnumModule "Blas.Primitive.Types" enumNames $ moduleDoc
-    "experimental"
-    "Enumerations used by the Blas interface."
   writeFile "../src/Blas/Primitive/Safe.chs" .
     ffiFunModule "Blas.Primitive.Safe" funInsts $ moduleDoc
     "experimental"

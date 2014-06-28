@@ -30,23 +30,12 @@ module Blas.Generic.Unsafe
        , RealNumeric(..)
        , C.dsdot
        , C.sdsdot
-       , foobar
        ) where
 import Data.Complex (Complex((:+)))
 import Foreign (Ptr, Storable)
 import FFI (getReturnValue)
 import Blas.Primitive.Types (Order, Transpose, Uplo, Diag, Side)
 import qualified Blas.Primitive.Unsafe as C
-
--- | Used to specify a unary operation `op` for matrices, which can be:
---
---     * @'id'@
---     * @'conjugate'@
---     * @'transpose'@
---     * @'conjugate' . 'transpose'@
---
-foobar :: a
-foobar = undefined
 
 -- | Blas operations that are applicable to real and complex numbers.
 --
