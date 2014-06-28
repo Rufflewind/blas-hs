@@ -14,25 +14,25 @@ module Blas.Primitive.Types
        , Side(..)
        ) where
 import Prelude hiding (Either(Left, Right))
+import Data.Ix (Ix)
 
--- | Specifies the order of the matrix dimensions in memory.
+-- | Memory layout of a matrix.
 data Order = RowMajor                   -- ^ Row-major order.
            | ColMajor                   -- ^ Column-major order.
-           deriving (Eq, Read, Show)
+           deriving (Bounded, Eq, Ix, Ord, Read, Show)
 
 instance Enum Order where
   fromEnum RowMajor = 101
   fromEnum ColMajor = 102
   toEnum 101 = RowMajor
   toEnum 102 = ColMajor
-  toEnum unmatched = error ("Order.toEnum: Cannot match " ++ show unmatched)
+  toEnum x   = error $ "Order.toEnum: Cannot match " ++ show x
 
-
--- | Specifies the unary operation @op@ for a matrix.
+-- | Operation applied to a matrix.
 data Transpose = NoTrans                -- ^ No operation.
                | Trans                  -- ^ Transposition.
                | ConjTrans              -- ^ Conjugation and transposition.
-               deriving (Eq, Read, Show)
+               deriving (Bounded, Eq, Ix, Ord, Read, Show)
 
 instance Enum Transpose where
   fromEnum NoTrans   = 111
@@ -41,41 +41,40 @@ instance Enum Transpose where
   toEnum 111 = NoTrans
   toEnum 112 = Trans
   toEnum 113 = ConjTrans
-  toEnum unmatched =
-    error $ "Transpose.toEnum: Cannot match " ++ show unmatched
+  toEnum x   = error $ "Transpose.toEnum: Cannot match " ++ show x
 
-data Uplo = Upper
-          | Lower
-          deriving (Eq, Read, Show)
+-- | Specifies which triangular part of a matrix is used.
+data Uplo = Upper                       -- ^ Upper triangular part.
+          | Lower                       -- ^ Lower triangular part.
+          deriving (Bounded, Eq, Ix, Ord, Read, Show)
 
 instance Enum Uplo where
   fromEnum Upper = 121
   fromEnum Lower = 122
   toEnum 121 = Upper
   toEnum 122 = Lower
-  toEnum unmatched =
-    error $ "Uplo.toEnum: Cannot match " ++ show unmatched
+  toEnum x   = error $ "Uplo.toEnum: Cannot match " ++ show x
 
-data Diag = NonUnit
-          | Unit
-          deriving (Eq, Read, Show)
+-- | Whether a matrix is unit triangular.
+data Diag = NonUnit                     -- ^ Not unit triangular.
+          | Unit                        -- ^ Unit triangular.
+          deriving (Bounded, Eq, Ix, Ord, Read, Show)
 
 instance Enum Diag where
   fromEnum NonUnit = 131
   fromEnum Unit    = 132
   toEnum 131 = NonUnit
   toEnum 132 = Unit
-  toEnum unmatched =
-    error $ "Diag.toEnum: Cannot match " ++ show unmatched
+  toEnum x   = error $ "Diag.toEnum: Cannot match " ++ show x
 
-data Side = Left
-          | Right
-          deriving (Eq, Read, Show)
+-- | The side that a matrix appears in the product.
+data Side = Left                        -- ^ On the left side.
+          | Right                       -- ^ On the right side.
+          deriving (Bounded, Eq, Ix, Ord, Read, Show)
 
 instance Enum Side where
   fromEnum Left  = 141
   fromEnum Right = 142
   toEnum 141 = Left
   toEnum 142 = Right
-  toEnum unmatched =
-    error $ "Side.toEnum: Cannot match " ++ show unmatched
+  toEnum x   = error $ "Side.toEnum: Cannot match " ++ show x

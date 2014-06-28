@@ -63,7 +63,7 @@ mkEnum :: String -> String
 mkEnum name =
   printf ("{# enum %s as %s {} with prefix = \"%s\"%s #}\n")
          (enumMangler name) name enumValuePrefix derivings
-  where derivings = " deriving (Eq, Read, Show)"
+  where derivings = " deriving (Bounded, Eq, Ord, Read, Show)"
 
 -- | Generates a c2hs hook for the function.
 mkFun :: CFun -> String
