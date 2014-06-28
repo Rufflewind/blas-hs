@@ -28,9 +28,7 @@ ffiModule name doc imports exports contents =
   , mExts     = [ "ForeignFunctionInterface" ]
   , mDoc      = doc
   , mImports  = [ "Prelude hiding (Either(Left, Right))"
-                , "Foreign.Storable.Complex ()"
-                , "Data.Complex (Complex)"
-                , "FFI" ] ++ imports
+                , "Foreign.Storable.Complex ()"] ++ imports
   , mExports  = exports
   , mContents = [ sysIncl "cblas.h" ]
              ++ fmap ("\n" ++) contents
@@ -42,7 +40,10 @@ ffiEnumModule name enums doc =
   (fmap mkEnum enums)
 
 ffiFunModule name functions doc =
-  ffiModule name doc ["Blas.Primitive.Types"]
+  ffiModule name doc
+  ["Data.Complex (Complex)"
+  , "Blas.Primitive.Types"
+  , "FFI" ]
   (fmap cfName functions)
   (fmap mkFun functions)
 

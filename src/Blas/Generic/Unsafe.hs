@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, NoMonomorphismRestriction, TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances, TypeFamilies #-}
 {-|
 
 Copyright: (c) 2014 Phil Ruffwind
@@ -19,22 +19,46 @@ The generic interfaces uses either safe (@*.Unsafe@) or unsafe (@*.Unsafe@)
 foreign calls.  Refer to the GHC documentation for more information regarding
 appropriate use of safe and unsafe foreign calls.
 
+It'd be really nice if these functions were actually documented.  Alas, for
+the time being, you'll have to refer to the various Blas docs scattered across
+the Internet.  Note that the interface is based off of /CBlas/, not Fortran
+Blas, which is slightly different.
+
 -}
 module Blas.Generic.Unsafe
        ( Numeric(..)
        , RealNumeric(..)
        , C.dsdot
        , C.sdsdot
+       , foobar
        ) where
 import Data.Complex (Complex((:+)))
-import FFI (Ptr, getReturnValue)
+import Foreign (Ptr, Storable)
+import FFI (getReturnValue)
 import Blas.Primitive.Types (Order, Transpose, Uplo, Diag, Side)
 import qualified Blas.Primitive.Unsafe as C
 
--- | Defines the types supported by Blas.
-class Floating a => Numeric a where
+-- | Used to specify a unary operation `op` for matrices, which can be:
+--
+--     * @'id'@
+--     * @'conjugate'@
+--     * @'transpose'@
+--     * @'conjugate' . 'transpose'@
+--
+foobar :: a
+foobar = undefined
+
+-- | Blas operations that are applicable to real and complex numbers.
+--
+--   Instances are defined for the 4 types supported by Blas: the
+--   single- and double-precision floating point types and their complex
+--   versions.
+class (Floating a, Storable a) => Numeric a where
 
   -- | The corresponding real type of @a@.
+  --
+  --   In other words, @'RealType' ('Complex' a)@ is an alias for @a@.  For
+  --   everything else, @'RealType' a@ is simply @a@.
   type RealType a :: *
 
   dotu  :: Int -> Ptr a -> Int -> Ptr a -> Int -> IO a
@@ -80,8 +104,30 @@ class Floating a => Numeric a where
         -> Ptr a -> Int -> IO ()
   hpr2  :: Order -> Uplo -> Int -> a -> Ptr a -> Int -> Ptr a -> Int
         -> Ptr a -> IO ()
-  gemm  :: Order -> Transpose -> Transpose -> Int -> Int -> Int -> a
-        -> Ptr a -> Int -> Ptr a -> Int -> a -> Ptr a -> Int -> IO ()
+
+  -- | Calculate a general matrix-matrix product:
+  --
+  --   > c := alpha * opa(a) * opb(b) + beta * c
+  --
+  --   where `opa` and `opb` are operations specified by @transa@ and
+  --   @transb@ respectively.
+  gemm  :: Order     -- ^ Layout of all matrices.
+        -> Transpose -- ^ (@transa@) Operation applied to @a@.
+        -> Transpose -- ^ (@transb@) Operation applied to @b@.
+        -> Int       -- ^ (@m@) Number of rows of @op(a)@ and @c@.
+        -> Int       -- ^ (@n@) Number of columns of @op(b)@ and @c@.
+        -> Int       -- ^ (@k@) Number of columns of @op(a)@ and
+                     --         number of of rows of @op(b)@.
+        -> a         -- ^ (@alpha@) Scaling factor of the product.
+        -> Ptr a     -- ^ (@a@) Pointer to a matrix.
+        -> Int       -- ^ (@lda@) Stride of the major dimension of @a@.
+        -> Ptr a     -- ^ (@b@) Pointer to a matrix.
+        -> Int       -- ^ (@ldb@) Stride of the major dimension of @b@.
+        -> a         -- ^ (@beta@) Scaling factor of the original @c@.
+        -> Ptr a     -- ^ (@c@) Pointer to a mutable matrix.
+        -> Int       -- ^ (@ldc@) Stride of the major dimension of @c@.
+        -> IO ()
+
   symm  :: Order -> Side -> Uplo -> Int -> Int -> a -> Ptr a -> Int
         -> Ptr a -> Int -> a -> Ptr a -> Int -> IO ()
   syrk  :: Order -> Uplo -> Transpose -> Int -> Int -> a -> Ptr a -> Int
@@ -99,6 +145,12 @@ class Floating a => Numeric a where
   trsm  :: Order -> Side -> Uplo -> Transpose -> Diag -> Int -> Int
         -> a -> Ptr a -> Int -> Ptr a -> Int -> IO ()
 
+-- | Blas operations that are only applicable to real numbers.
+--
+--   Note: although complex versions of 'rot' and 'rotg' exist in many
+--   implementations, they are not part of the official Blas standard and
+--   therefore not included here.  If you /really/ need them, submit a ticket
+--   so we can try to come up with a solution.
 class Numeric a => RealNumeric a where
   rotg  :: Ptr a -> Ptr a -> Ptr a -> Ptr a -> IO ()
   rotmg :: Ptr a -> Ptr a -> Ptr a -> a -> Ptr a -> IO ()

@@ -12,8 +12,8 @@ module Blas.Primitive.Unsafe (sdsdot, dsdot, sdot, ddot, cdotu_sub, zdotu_sub, c
 import Prelude hiding (Either(Left, Right))
 import Foreign.Storable.Complex ()
 import Data.Complex (Complex)
-import FFI
 import Blas.Primitive.Types
+import FFI
 
 #include <cblas.h>
 

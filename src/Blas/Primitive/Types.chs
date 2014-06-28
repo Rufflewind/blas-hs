@@ -11,8 +11,6 @@ Enumerations used by the Blas interface.
 module Blas.Primitive.Types (Order(..), Transpose(..), Uplo(..), Diag(..), Side(..)) where
 import Prelude hiding (Either(Left, Right))
 import Foreign.Storable.Complex ()
-import Data.Complex (Complex)
-import FFI
 
 #include <cblas.h>
 
