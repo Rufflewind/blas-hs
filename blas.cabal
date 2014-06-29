@@ -27,4 +27,4 @@ library
   hs-source-dirs:      src
   default-language:    Haskell98
   extra-libraries:     blas
-  build-tools:         c2hs
+  build-tools:         c2hs >=0.16.6 && <0.18
