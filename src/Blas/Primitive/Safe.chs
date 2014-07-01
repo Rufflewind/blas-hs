@@ -2,7 +2,7 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-|
 
-Stability: experimental
+Stability: stable
 
 Foreign function interface to Blas.  These functions use safe
 foreign calls.  Refer to the GHC documentation for more information regarding

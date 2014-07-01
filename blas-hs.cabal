@@ -1,7 +1,11 @@
 name:                blas-hs
-version:             0.1.0.0
-synopsis:            Low-level bindings to Blas.
-description:         Low-level bindings to Blas.
+version:             0.1.0.1
+synopsis:            Low-level Haskell bindings to Blas.
+description:         This package provides a complete low-level binding to
+                     Blas via the foreign function interface, allowing Haskell
+                     programs to take advantage of optimized routines for
+                     vector and matrix operations in Haskell.  See the source
+                     repository for more info.
 homepage:            https://github.com/Rufflewind/blas-hs
 license:             MIT
 license-file:        LICENSE
@@ -11,13 +15,16 @@ category:            Math
 build-type:          Simple
 cabal-version:       >=1.10
 
+source-repository head
+  type:              git
+  location:          https://github.com/Rufflewind/blas-hs
+
 library
   exposed-modules:     Blas.Primitive.Types
                        Blas.Primitive.Safe
                        Blas.Primitive.Unsafe
                        Blas.Generic.Safe
                        Blas.Generic.Unsafe
-  -- other-modules:
   other-extensions:    FlexibleInstances
                      , ForeignFunctionInterface
                      , TypeFamilies

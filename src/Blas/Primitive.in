@@ -11,7 +11,7 @@ safety = ARGV[2]
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-|
 
-Stability: experimental
+Stability: stable
 
 Foreign function interface to Blas.  These functions use #{safety.downcase}
 foreign calls.  Refer to the GHC documentation for more information regarding
