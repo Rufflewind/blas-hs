@@ -1,67 +1,37 @@
 #!/usr/bin/env runhaskell
 -- -*- haskell -*-
 --
--- Blas FFI interface generator
--- ============================
---
--- This script generates an input file for c2hs, which generates a low-level
--- FFI interface to CBlas.
+-- Generates a low-level FFI interface to CBlas using c2hs.
 --
 {-# LANGUAGE NoMonomorphismRestriction #-}
 module Main where
 import Data.List (intercalate)
 import Text.Printf (printf)
-import Mod
 import Defs
-
-moduleDoc stability body =
-  intercalate "\n"
-  [ "Copyright: (c) 2014 Phil Ruffwind"
-  , "License: MIT"
-  , "Maintainer: rf@rufflewind.com"
-  , "Stability: " ++ stability
-  , body ]
-
-ffiModule name doc imports exports contents =
-  mkModule $ Module
-  { mName     = name
-  , mExts     = [ "ForeignFunctionInterface" ]
-  , mDoc      = doc
-  , mImports  = "Prelude hiding (Either(Left, Right))" : imports
-  , mExports  = exports
-  , mContents = [ sysIncl "cblas.h" ]
-             ++ fmap ("\n" ++) contents
-  }
-
-ffiEnumModule name enums doc =
-  ffiModule name doc []
-  (fmap (++ "(..)") enums)
-  (fmap mkEnum enums)
-
-ffiFunModule name functions doc =
-  ffiModule name doc
-  [ "Data.Complex (Complex)"
-  , "Foreign.Storable.Complex ()"
-  , "Blas.Primitive.Types"
-  , "FFI" ]
-  (fmap cfName functions)
-  (fmap mkFun functions)
 
 main :: IO ()
 main = do
-  writeFile "../src/Blas/Primitive/Safe.chs" .
-    ffiFunModule "Blas.Primitive.Safe" funInsts $ moduleDoc
-    "experimental"
-    "Foreign function interface to Blas.  These functions use safe foreign calls, which do not block other Haskell threads."
-  writeFile "../src/Blas/Primitive/Unsafe.chs" .
-    ffiFunModule "Blas.Primitive.Unsafe" funInstsUnsafe $ moduleDoc
-    "experimental"
-    "Foreign function interface to Blas.  These functions use unsafe foreign calls, which have a lower overhead."
+  let dir = "../src/Blas/Primitive"
+  writeFile (dir ++ "/Safe.chs.tmp")   $ ffiFuncModule funInsts
+  writeFile (dir ++ "/Unsafe.chs.tmp") $ ffiFuncModule funInstsUnsafe
+
+ffiModule exports contents =
+  rubyVars $
+  [ ("exports",  intercalate ", "   exports)
+  , ("contents", intercalate "\n\n" contents) ]
+
+ffiEnumModule enums = ffiModule (fmap (++ "(..)") enums) (fmap mkEnum enums)
+ffiFuncModule funcs = ffiModule (fmap cfName funcs)      (fmap mkFun funcs)
+
+-- | Convert a set of global Ruby variables into a string.
+--   Note: the values are not escaped.
+rubyVars :: [(String, String)] -> String
+rubyVars = intercalate "\n\n" . (fmap $ uncurry $ printf "$%s = %%[%s]\n")
 
 -- | Generates a c2hs hook for the enumeration.
 mkEnum :: String -> String
 mkEnum name =
-  printf ("{# enum %s as %s {} with prefix = \"%s\"%s #}\n")
+  printf ("{# enum %s as %s {} with prefix = \"%s\"%s #}")
          (enumMangler name) name enumValuePrefix derivings
   where derivings = " deriving (Bounded, Eq, Ord, Read, Show)"
 
@@ -69,7 +39,7 @@ mkEnum name =
 mkFun :: CFun -> String
 mkFun (CFun safe name params ret doc) =
   (if null doc then "" else "-- | " ++ doc) ++
-  printf "{# fun%s %s%s { %s } -> %s #}\n"
+  printf "{# fun%s %s%s { %s } -> %s #}"
          safe' cName hName params' ret'
   where cName   = funMangler name
         hName   = if name == cName then "" else " as " ++ name

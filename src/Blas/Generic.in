@@ -1,10 +1,16 @@
-{- This file is auto-generated.  Do not edit directly. -}
+#{# -*- haskell -*-
+require "./tools/common"
+stem = strip_ext FILE
+name = File.basename stem
+["Safe", "Unsafe"].each do |safety|
+  write_file "#{stem}/#{safety}.hs", <<END
+#{AUTOGEN}
 {-# LANGUAGE FlexibleInstances, TypeFamilies #-}
 {-|
 
 Stability: experimental
 
-Generic interface to Blas using unsafe foreign calls.  Refer to
+Generic interface to Blas using #{safety.downcase} foreign calls.  Refer to
 the GHC documentation for more information regarding appropriate use of safe
 and unsafe foreign calls.
 
@@ -21,7 +27,7 @@ the Internet.  Note that the interface is based off of /CBlas/, not Fortran
 Blas, which is slightly different.
 
 -}
-module Blas.Generic.Unsafe
+module Blas.#{name}.#{safety}
        ( Numeric(..)
        , RealNumeric(..)
        , C.dsdot
@@ -31,7 +37,7 @@ import Data.Complex (Complex((:+)))
 import Foreign (Ptr, Storable)
 import FFI (getReturnValue)
 import Blas.Primitive.Types (Order, Transpose, Uplo, Diag, Side)
-import qualified Blas.Primitive.Unsafe as C
+import qualified Blas.Primitive.#{safety} as C
 
 -- | Blas operations that are applicable to real and complex numbers.
 --
@@ -307,3 +313,5 @@ instance Numeric (Complex Double) where
   her2k = C.zher2k
   trmm  = C.ztrmm
   trsm  = C.ztrsm
+END
+end }

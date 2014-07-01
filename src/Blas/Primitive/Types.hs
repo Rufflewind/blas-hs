@@ -1,10 +1,9 @@
 {-|
-Module: Blas.Primitive.Types
-Copyright: (c) 2014 Phil Ruffwind
-License: MIT
-Maintainer: rf@rufflewind.com
+
 Stability: experimental
+
 Enumerations used by the Blas interface.
+
 -}
 module Blas.Primitive.Types
        ( Order(..)

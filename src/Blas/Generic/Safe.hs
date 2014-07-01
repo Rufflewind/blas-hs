@@ -1,12 +1,12 @@
+{- This file is auto-generated.  Do not edit directly. -}
 {-# LANGUAGE FlexibleInstances, TypeFamilies #-}
 {-|
 
-Copyright: (c) 2014 Phil Ruffwind
-License: MIT
-Maintainer: rf@rufflewind.com
 Stability: experimental
 
-Generic interface to Blas.
+Generic interface to Blas using safe foreign calls.  Refer to
+the GHC documentation for more information regarding appropriate use of safe
+and unsafe foreign calls.
 
 The functions here are named in a similar fashion to the original Blas
 interface, with the type-dependent letter(s) removed.  Some functions have
@@ -14,10 +14,6 @@ been merged with others to allow the interface to work on both real and
 complex numbers.  If you can't a particular function, try looking for its
 corresponding complex equivalent (e.g. @symv@ is a special case of 'hemv'
 applied to real numbers).
-
-The generic interfaces uses either safe (@*.Safe@) or unsafe (@*.Unsafe@)
-foreign calls.  Refer to the GHC documentation for more information regarding
-appropriate use of safe and unsafe foreign calls.
 
 It'd be really nice if these functions were actually documented.  Alas, for
 the time being, you'll have to refer to the various Blas docs scattered across
