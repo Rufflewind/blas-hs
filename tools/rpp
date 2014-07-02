@@ -1,4 +1,17 @@
 #!/bin/sh
+#
+# Usage: rpp [FILE]
+#
+# A simple preprocessor that uses Ruby process the text files.  The entire
+# document is treated as one Ruby string in the here-document syntax, but
+# without the beginning or end delimiters.
+#
+# If `FILE` is not provided or is a hyphen (`-`), then the standard input is
+# used as input.  Otherwise `FILE` is used as input.
+#
+# Within the file, the filename of the input file can be accessed via a Ruby
+# variable named `FILE`.
+#
 if [ -n "${1+x}" ]
 then
     FILE="$1"

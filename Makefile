@@ -1,3 +1,6 @@
+# This makefile is only needed for developing or otherwise modifying the
+# package.  For users of the package, simply use Cabal.
+
 all: build
 
 clean:

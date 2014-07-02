@@ -11,3 +11,11 @@ def write_file(filename, string)
     f.puts(string)
   end
 end
+
+def camel_to_pascal(name)
+  name[0..0].upcase + name[1..-1]
+end
+
+def pascal_to_camel(name)
+  name[0..0].downcase + name[1..-1]
+end
