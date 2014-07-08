@@ -19,8 +19,8 @@ Interface
 The package provides two complete interfaces:
 
 - The `Blas.Primitive.*` modules expose the raw C interface.  All functions
-  are named in the same fashion as the original Blas interface with the prefix
-  removed.  This interface is stable.
+  are named in the same fashion as the original Blas interface with the
+  `cblas_` prefix removed.  This interface is stable.
 
 - The `Blas.Generic.*` modules expose a slightly more sophisticated interface
   via type classes, allowing the functions to work on any of the 4 types
