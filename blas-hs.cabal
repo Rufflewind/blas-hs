@@ -12,7 +12,7 @@ license-file:        LICENSE
 author:              Phil Ruffwind
 maintainer:          rf@rufflewind.com
 category:            Math
-build-type:          Simple
+build-type:          Custom
 cabal-version:       >=1.10
 
 source-repository head
@@ -34,12 +34,3 @@ library
   hs-source-dirs:      src
   default-language:    Haskell98
   build-tools:         c2hs >=0.16.6 && <0.18
-
-  -- Use the following flags if you want `blas-hs` to be directly linked
-  -- against an existing Blas implementation (e.g. ACML, OpenBLAS, MKL).  This
-  -- will relieve the `blas-hs` user of the responsibility of specifying the
-  -- flags for linking to the Blas implementation.
-  --
-  -- The flags have no effect on the static version of `blas-hs`.
-  extra-libraries:
-  ld-options:
