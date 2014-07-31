@@ -15,6 +15,7 @@ maintainer:          rf@rufflewind.com
 category:            Math
 build-type:          Simple
 cabal-version:       >=1.10
+                     -- untested: 1.10 [soft] to ???
 
 source-repository head
   type:                git
@@ -29,8 +30,12 @@ library
   other-extensions:    FlexibleInstances
                      , ForeignFunctionInterface
                      , TypeFamilies
-  build-depends:       base >=4.5 && <4.8
-                     , storable-complex >=0.2 && <0.3
+  build-depends:       base >=4.5
+                       -- tested: 4.5 [hard] to 4.8 [soft]
+                       -- (4.4 does not export constructors for CFloat et al)
+                     , storable-complex >=0.2
+                       -- tested: 0.2 [hard] to 0.3 [soft]
+                       -- (0.1 is buggy)
   ghc-options:         -Wall
   hs-source-dirs:      src
   default-language:    Haskell98

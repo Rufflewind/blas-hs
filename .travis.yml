@@ -1,0 +1,12 @@
+language: haskell
+ghc:
+  - 7.8
+  - 7.6
+  - 7.4
+before_install:
+  - sudo apt-get update -qq
+  - cabal update
+install:
+  - sudo apt-get install -y libblas-dev
+  - cabal install storable-complex
+script: cabal configure --verbose --enable-tests && cabal build && cabal test

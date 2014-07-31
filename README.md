@@ -1,7 +1,7 @@
-blas-hs: a Haskell interface to Blas
-====================================
+blas-hs [![Build status][ci]][ca]
+=================================
 
-**blas-hs** provides a complete low-level binding to Blas via the foreign
+**blas-hs** provides a complete low-level interface to Blas via the foreign
 function interface, allowing Haskell programs to take advantage of optimized
 routines for vector and matrix operations in Haskell.  For more information
 about Blas, see http://netlib.org/blas
@@ -71,3 +71,6 @@ For other implementations, consult the relevant documentation on linker flags.
 By default, **blas-hs** does not directly link to the Blas library.  This
 allows the user of **blas-hs** to have the choice of any compliant
 implementation.
+
+[ca]: https://travis-ci.org/Rufflewind/blas-hs
+[ci]: https://travis-ci.org/Rufflewind/blas-hs.svg?branch=master
