@@ -7,6 +7,7 @@ description:         This package provides a complete low-level binding to
                      vector and matrix operations in Haskell.  See the source
                      repository for more info.
 homepage:            https://github.com/Rufflewind/blas-hs
+bug-reports:         https://github.com/Rufflewind/blas-hs/issues
 license:             MIT
 license-file:        LICENSE
 author:              Phil Ruffwind
@@ -33,7 +34,6 @@ library
   ghc-options:         -Wall
   hs-source-dirs:      src
   default-language:    Haskell98
-  build-tools:         c2hs >=0.16.6 && <0.18
 
   -- Use the following flags if you want `blas-hs` to be directly linked
   -- against an existing Blas implementation (e.g. ACML, OpenBLAS, MKL).  This

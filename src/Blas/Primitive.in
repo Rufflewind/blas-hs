@@ -21,10 +21,11 @@ appropriate use of safe and unsafe foreign calls.
 module Blas.#{name}.#{safety} (#{$exports}) where
 import Prelude hiding (Either(Left, Right))
 import Data.Complex (Complex)
-import Foreign.Storable.Complex ()
-import Blas.#{name}.Types
 import Foreign (Ptr, castPtr)
 import Foreign.C.Types
+import Foreign.Storable.Complex ()
+import Blas.#{name}.Types
+import BlasCTypes
 import FFI
 
 #include #{CBLAS_HEADER_FILENAME}

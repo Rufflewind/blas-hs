@@ -26,7 +26,10 @@ a.out
 # Haskell
 .cabal-sandbox/
 cabal.sandbox.config
+src/Blas/Primitive/blas.h
+*_.chs
 *.chi
+*.chs.h
 *.hcr
 *.hi
 

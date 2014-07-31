@@ -1,0 +1,12 @@
+#!/bin/sh
+file="$1"
+
+if [ -z "$file" ]
+then
+    echo >&2 "usage: post-process FILE"
+    exit 1
+fi
+
+sed -i 's/[ 	]\+$//' "$file"
+sed -i 's/CInt/BlasInt/g' "$file"
+sed -i 's/CULong/BlasIndex/g' "$file"
