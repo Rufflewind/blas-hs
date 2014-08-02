@@ -1,5 +1,5 @@
 name:                blas-hs
-version:             0.1.0.1
+version:             0.1.0.2
 synopsis:            Low-level Haskell bindings to Blas.
 description:         This package provides a complete low-level binding to
                      Blas via the foreign function interface, allowing Haskell
