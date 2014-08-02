@@ -11,7 +11,9 @@ interface for Blas.  If your implementation does not provide a C interface or
 uses a nonstandard interface, consider installing the CBlas binding from
 Netlib: http://netlib.org/blas/blast-forum/cblas.tgz
 
-Documentation is available [here](http://rufflewind.com/blas-hs).
+Documentation is available [here][doc].
+
+Here is the [versioning policy of this package][pvp].
 
 Interface
 ---------
@@ -35,11 +37,11 @@ Prerequisites
 -------------
 
 **blas-hs** requires either the
-[reference implementation of Blas from Netlib](http://netlib.org/blas) or any
-alternative compliant implementation of Blas (e.g. ACML, ATLAS, OpenBLAS, MKL,
-and many others).  Furthermore, the implementation must supply a C interface
-(*not* the Fortran one).  Fortunately, as long as the Fortran interface is
-available, one can use the CBlas binding from Netlib to remedy this:
+[reference implementation of Blas from Netlib][ref] or any alternative
+compliant implementation of Blas (e.g. ACML, ATLAS, OpenBLAS, MKL, and many
+others).  Furthermore, the implementation must supply a C interface (*not* the
+Fortran one).  Fortunately, as long as the Fortran interface is available, one
+can use the CBlas binding from Netlib to remedy this:
 http://netlib.org/blas/blast-forum/cblas.tgz
 
 Building
@@ -72,5 +74,8 @@ By default, **blas-hs** does not directly link to the Blas library.  This
 allows the user of **blas-hs** to have the choice of any compliant
 implementation.
 
-[ca]: https://travis-ci.org/Rufflewind/blas-hs
-[ci]: https://travis-ci.org/Rufflewind/blas-hs.svg?branch=master
+[ca]:  https://travis-ci.org/Rufflewind/blas-hs
+[ci]:  https://travis-ci.org/Rufflewind/blas-hs.svg?branch=master
+[ref]: http://netlib.org/blas
+[pvp]: https://gist.github.com/Rufflewind/03f4e03f7cfa52b8f07d
+[doc]: http://rufflewind.com/blas-hs
