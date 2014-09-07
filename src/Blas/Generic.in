@@ -105,10 +105,10 @@ class (Floating a, Storable a) => Numeric a where
   gemm  :: Order     -- ^ Layout of all matrices.
         -> Transpose -- ^ (@transa@) Operation applied to @a@.
         -> Transpose -- ^ (@transb@) Operation applied to @b@.
-        -> Int       -- ^ (@m@) Number of rows of @op(a)@ and @c@.
-        -> Int       -- ^ (@n@) Number of columns of @op(b)@ and @c@.
-        -> Int       -- ^ (@k@) Number of columns of @op(a)@ and
-                     --         number of of rows of @op(b)@.
+        -> Int       -- ^ (@m@) Number of rows of @opa(a)@ and @c@.
+        -> Int       -- ^ (@n@) Number of columns of @opb(b)@ and @c@.
+        -> Int       -- ^ (@k@) Number of columns of @opa(a)@ and
+                     --         number of of rows of @opb(b)@.
         -> a         -- ^ (@alpha@) Scaling factor of the product.
         -> Ptr a     -- ^ (@a@) Pointer to a matrix.
         -> Int       -- ^ (@lda@) Stride of the major dimension of @a@.
