@@ -1,5 +1,5 @@
 name:                blas-hs
-version:             0.1.0.2
+version:             0.1.1.0
 synopsis:            Low-level Haskell bindings to Blas.
 description:         This package provides a complete low-level binding to
                      Blas via the foreign function interface, allowing Haskell
@@ -29,6 +29,14 @@ library
                        Blas.Primitive.Unsafe
                        Blas.Generic.Safe
                        Blas.Generic.Unsafe
+                       Blas.Specialized.Float.Safe
+                       Blas.Specialized.Double.Safe
+                       Blas.Specialized.ComplexFloat.Safe
+                       Blas.Specialized.ComplexDouble.Safe
+                       Blas.Specialized.Float.Unsafe
+                       Blas.Specialized.Double.Unsafe
+                       Blas.Specialized.ComplexFloat.Unsafe
+                       Blas.Specialized.ComplexDouble.Unsafe
   other-modules:       BlasCTypes
                        FFI
   other-extensions:    FlexibleInstances

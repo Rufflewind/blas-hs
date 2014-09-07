@@ -16,14 +16,30 @@ clean:
 	    src/Blas/Primitive/Unsafe.hs \
 	    src/Blas/Primitive/Unsafe.chs.tmp \
 	    src/Blas/Generic/Safe.hs \
-	    src/Blas/Generic/Unsafe.hs
+	    src/Blas/Generic/Unsafe.hs \
+	    src/Blas/Specialized/Float/Safe.hs \
+	    src/Blas/Specialized/Double/Safe.hs \
+	    src/Blas/Specialized/ComplexFloat/Safe.hs \
+	    src/Blas/Specialized/ComplexDouble/Safe.hs \
+	    src/Blas/Specialized/Float/Unsafe.hs \
+	    src/Blas/Specialized/Double/Unsafe.hs \
+	    src/Blas/Specialized/ComplexFloat/Unsafe.hs \
+	    src/Blas/Specialized/ComplexDouble/Unsafe.hs
 	cabal clean
 
 build: \
     src/Blas/Primitive/Safe.hs \
     src/Blas/Primitive/Unsafe.hs \
     src/Blas/Generic/Safe.hs \
-    src/Blas/Generic/Unsafe.hs
+    src/Blas/Generic/Unsafe.hs \
+    src/Blas/Specialized/Float/Safe.hs \
+    src/Blas/Specialized/Double/Safe.hs \
+    src/Blas/Specialized/ComplexFloat/Safe.hs \
+    src/Blas/Specialized/ComplexDouble/Safe.hs \
+    src/Blas/Specialized/Float/Unsafe.hs \
+    src/Blas/Specialized/Double/Unsafe.hs \
+    src/Blas/Specialized/ComplexFloat/Unsafe.hs \
+    src/Blas/Specialized/ComplexDouble/Unsafe.hs
 	cabal build
 
 doc: build
@@ -87,3 +103,19 @@ src/Blas/Generic/Unsafe.hs: \
     tools/common.rb
 	mkdir -p src/Blas/Generic
 	tools/rpp >/dev/null src/Blas/Generic.in
+
+src/Blas/Specialized/Float/Safe.hs \
+src/Blas/Specialized/Double/Safe.hs \
+src/Blas/Specialized/ComplexFloat/Safe.hs \
+src/Blas/Specialized/ComplexDouble/Safe.hs \
+src/Blas/Specialized/Float/Unsafe.hs \
+src/Blas/Specialized/Double/Unsafe.hs \
+src/Blas/Specialized/ComplexFloat/Unsafe.hs \
+src/Blas/Specialized/ComplexDouble/Unsafe.hs: \
+    src/Blas/Specialized.in \
+    tools/common.rb
+	mkdir -p src/Blas/Specialized/Float \
+	         src/Blas/Specialized/Double \
+	         src/Blas/Specialized/ComplexFloat \
+	         src/Blas/Specialized/ComplexDouble
+	tools/rpp >/dev/null src/Blas/Specialized.in

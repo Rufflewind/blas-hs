@@ -1,0 +1,535 @@
+#{# -*- haskell -*-
+require "./tools/common"
+stem = strip_ext FILE
+name = File.basename stem
+["Safe", "Unsafe"].each do |safety|
+  [
+    ["Float", "Float", "s", "s"],
+    ["Double", "Double", "d", "d"],
+    ["Complex Float", "Float", "c", "s"],
+    ["Complex Double", "Double", "z", "d"],
+  ].each do |num_type, real_type, abbrev, real_abbrev|
+    paren_type = (num_type.include? " ") ? "(" + num_type + ")" : num_type
+    is_real    = real_type == num_type
+    out_name   = "#{num_type.tr " ", ""}/#{safety}"
+    mod_name   = "Blas.#{name}.#{out_name.tr "/", "."}"
+    write_file "#{stem}/#{out_name}.hs", <<END
+#{AUTOGEN}
+{-|
+
+Stability: experimental
+
+Generic interface to Blas using #{safety.downcase} foreign calls.  Refer to
+the GHC documentation for more information regarding appropriate use of safe
+and unsafe foreign calls.
+
+The functions here are named in a similar fashion to the original Blas
+interface, with the type-dependent letter(s) removed.  Some functions have
+been merged with others to allow the interface to work on both real and
+complex numbers.  If you can't a particular function, try looking for its
+corresponding complex equivalent (e.g. @symv@ is a special case of 'hemv'
+applied to real numbers).
+
+Note: although complex versions of 'rot' and 'rotg' exist in many
+implementations, they are not part of the official Blas standard and therefore
+not included here.  If you /really/ need them, submit a ticket so we can try
+to come up with a solution.
+
+The documentation here is still incomplete.  Consult the
+<http://netlib.org/blas/#_blas_routines official documentation> for more
+information.
+
+Notation:
+
+  * @⋅@ denotes dot product (without any conjugation).
+
+  * @*@ denotes complex conjugation.
+
+  * @⊤@ denotes transpose.
+
+  * @†@ denotes conjugate transpose (Hermitian conjugate).
+
+Conventions:
+
+  * All scalars are denoted with lowercase Greek letters
+
+  * All vectors are denoted with lowercase Latin letters and are assumed to be
+    column vectors (unless transposed).
+
+  * All matrices are denoted with uppercase Latin letters.
+
+-}
+module #{mod_name}
+  (
+
+  -- * Level 1: vector-vector operations
+
+#{ if is_real then "
+
+  -- ** Givens rotations
+    rotg
+  , rotmg
+  , rot
+  , rotm
+  ,
+" end }
+
+  -- ** Basic operations
+    swap
+  , scal
+  , copy
+  , axpy
+  , dotu
+  , dotc
+
+#{ if num_type == "Float" then "
+  , sdsdot
+" end }
+
+#{ if num_type == "Double" then "
+  , dsdot
+" end }
+
+  -- ** Norm operations
+  , nrm2
+  , asum
+  , iamax
+
+  -- * Level 2: matrix-vector operations
+
+  -- ** Multiplication
+  , gemv
+  , gbmv
+  , hemv
+  , hbmv
+  , hpmv
+
+  -- ** Triangular operations
+  , trmv
+  , tbmv
+  , tpmv
+  , trsv
+  , tbsv
+  , tpsv
+
+  -- ** Rank updates
+  , geru
+  , gerc
+  , her
+  , hpr
+  , her2
+  , hpr2
+
+  -- * Level 3: matrix-matrix operations
+
+  -- ** Multiplication
+  , gemm
+  , symm
+  , hemm
+
+  -- ** Rank updates
+  , syrk
+  , herk
+  , syr2k
+  , her2k
+
+  -- ** Triangular operations
+  , trmm
+  , trsm
+
+       ) where
+import Foreign (Ptr)#{ "
+import Data.Complex (Complex((:+)))
+import FFI (getReturnValue)
+"[0..-2] unless is_real }
+import Blas.Primitive.Types (Order, Transpose, Uplo, Diag, Side)
+import qualified Blas.Primitive.#{safety} as C
+
+-- | Calculate the bilinear dot product of two vectors:
+--
+--   > x ⋅ y ≡ ∑[i] x[i] y[i]
+--
+dotu :: Int -> Ptr #{paren_type} -> Int -> Ptr #{paren_type} -> Int
+     -> IO #{paren_type}
+dotu #{ is_real ?
+              "= C.#{abbrev}dot" :
+    "a b c d e = getReturnValue (C.#{abbrev}dotu_sub a b c d e)" }
+
+-- | Calculate the sesquilinear dot product of two vectors.
+--
+--   > x* ⋅ y ≡ ∑[i] x[i]* y[i]
+--
+dotc :: Int -> Ptr #{paren_type} -> Int -> Ptr #{paren_type} -> Int
+     -> IO #{paren_type}
+#{ is_real ?
+"dotc = C.#{abbrev}dot" :
+"dotc a b c d e = getReturnValue (C.#{abbrev}dotc_sub a b c d e)" }
+
+-- | Calculate the Euclidean (L²) norm of a vector:
+--
+--   > ‖x‖₂ ≡ √(∑[i] x[i]²)
+--
+nrm2 :: Int -> Ptr #{paren_type} -> Int -> IO #{real_type}
+nrm2 = C.#{ is_real ? "" : real_abbrev }#{abbrev}nrm2
+
+-- | Calculate the Manhattan (L¹) norm, equal to the sum of the magnitudes of
+--   the elements:
+--
+--   > ‖x‖₁ = ∑[i] |x[i]|
+--
+asum :: Int -> Ptr #{paren_type} -> Int -> IO #{real_type}
+asum = C.#{ is_real ? "" : real_abbrev }#{abbrev}asum
+
+-- | Calculate the index of the element with the maximum magnitude (absolute
+--   value).
+iamax :: Int -> Ptr #{paren_type} -> Int -> IO Int
+iamax = C.i#{abbrev}amax
+
+-- | Swap two vectors:
+--
+--   > (x, y) ← (y, x)
+--
+swap :: Int -> Ptr #{paren_type} -> Int -> Ptr #{paren_type} -> Int -> IO ()
+swap = C.#{abbrev}swap
+
+-- | Copy a vector into another vector:
+--
+--   > y ← x
+--
+copy :: Int -> Ptr #{paren_type} -> Int -> Ptr #{paren_type} -> Int -> IO ()
+copy = C.#{abbrev}copy
+
+-- | Add a scalar-vector product to a vector:
+--
+--   > y ← α x + y
+--
+axpy :: Int -> #{num_type} -> Ptr #{paren_type} -> Int -> Ptr #{paren_type}
+     -> Int -> IO ()
+axpy = C.#{abbrev}axpy
+
+-- | Multiply a vector by a scalar:
+--
+--   > x ← α x
+--
+scal :: Int -> #{num_type} -> Ptr #{paren_type} -> Int -> IO ()
+#{(is_real ? "
+scal = C.#{abbrev}scal
+" : "
+scal n (alpha :+ 0) = C.#{abbrev}#{real_abbrev}scal n alpha
+scal n  alpha       = C.#{abbrev}scal  n alpha
+")[1..-2] }
+
+-- | Perform a general matrix-vector update.
+--
+--   > y ← α T(A) x + β y
+--
+gemv :: Order -> Transpose -> Int -> Int -> #{num_type} -> Ptr #{paren_type}
+     -> Int -> Ptr #{paren_type} -> Int -> #{num_type} -> Ptr #{paren_type}
+     -> Int -> IO ()
+gemv = C.#{abbrev}gemv
+
+-- | Perform a general banded matrix-vector update.
+--
+--   > y ← α T(A) x + β y
+--
+gbmv :: Order -> Transpose -> Int -> Int -> Int -> Int -> #{num_type}
+     -> Ptr #{paren_type} -> Int -> Ptr #{paren_type} -> Int -> #{num_type}
+     -> Ptr #{paren_type} -> Int -> IO ()
+gbmv = C.#{abbrev}gbmv
+
+-- | Multiply a triangular matrix by a vector.
+--
+--   > x ← T(A) x
+--
+trmv :: Order -> Uplo -> Transpose -> Diag -> Int -> Ptr #{paren_type}
+     -> Int -> Ptr #{paren_type} -> Int -> IO ()
+trmv = C.#{abbrev}trmv
+
+-- | Multiply a triangular banded matrix by a vector.
+--
+--   > x ← T(A) x
+--
+tbmv :: Order -> Uplo -> Transpose -> Diag -> Int -> Int -> Ptr #{paren_type}
+     -> Int -> Ptr #{paren_type} -> Int -> IO ()
+tbmv = C.#{abbrev}tbmv
+
+-- | Multiply a triangular packed matrix by a vector.
+--
+--   > x ← T(A) x
+--
+tpmv :: Order -> Uplo -> Transpose -> Diag -> Int -> Ptr #{paren_type}
+     -> Ptr #{paren_type} -> Int -> IO ()
+tpmv = C.#{abbrev}tpmv
+
+-- | Multiply an inverse triangular matrix by a vector.
+--
+--   > x ← T(A⁻¹) x
+--
+trsv :: Order -> Uplo -> Transpose -> Diag -> Int -> Ptr #{paren_type}
+     -> Int -> Ptr #{paren_type} -> Int -> IO ()
+trsv = C.#{abbrev}trsv
+
+-- | Multiply an inverse triangular banded matrix by a vector.
+--
+--   > x ← T(A⁻¹) x
+--
+tbsv :: Order -> Uplo -> Transpose -> Diag -> Int -> Int -> Ptr #{paren_type}
+     -> Int -> Ptr #{paren_type} -> Int -> IO ()
+tbsv = C.#{abbrev}tbsv
+
+-- | Multiply an inverse triangular packed matrix by a vector.
+--
+--   > x ← T(A⁻¹) x
+--
+tpsv :: Order -> Uplo -> Transpose -> Diag -> Int -> Ptr #{paren_type}
+     -> Ptr #{paren_type} -> Int -> IO ()
+tpsv = C.#{abbrev}tpsv
+
+-- | Perform a hermitian matrix-vector update.
+--
+--   > y ← α A x + β y
+--
+hemv :: Order -> Uplo -> Int -> #{num_type} -> Ptr #{paren_type} -> Int
+     -> Ptr #{paren_type} -> Int -> #{num_type} -> Ptr #{paren_type} -> Int
+     -> IO ()
+hemv = C.#{abbrev}#{ is_real ? "sy" : "he" }mv
+
+-- | Perform a hermitian banded matrix-vector update.
+--
+--   > y ← α A x + β y
+--
+hbmv :: Order -> Uplo -> Int -> Int -> #{num_type} -> Ptr #{paren_type}
+     -> Int -> Ptr #{paren_type} -> Int -> #{num_type} -> Ptr #{paren_type}
+     -> Int -> IO ()
+hbmv = C.#{abbrev}#{ is_real ? "s" : "h" }bmv
+
+-- | Perform a hermitian packed matrix-vector update.
+--
+--   > y ← α A x + β y
+--
+hpmv :: Order -> Uplo -> Int -> #{num_type} -> Ptr #{paren_type}
+     -> Ptr #{paren_type} -> Int -> #{num_type} -> Ptr #{paren_type}
+     -> Int -> IO ()
+hpmv = C.#{abbrev}#{ is_real ? "s" : "h" }pmv
+
+-- | Perform an unconjugated rank-1 update of a general matrix.
+--
+--   > A ← α x y⊤ + A
+--
+geru :: Order -> Int -> Int -> #{num_type} -> Ptr #{paren_type} -> Int
+     -> Ptr #{paren_type} -> Int -> Ptr #{paren_type} -> Int -> IO ()
+geru = C.#{abbrev}ger#{is_real ? "" : "u"}
+
+-- | Perform a conjugated rank-1 update of a general matrix.
+--
+--   > A ← α x y† + A
+--
+gerc :: Order -> Int -> Int -> #{num_type} -> Ptr #{paren_type} -> Int
+     -> Ptr #{paren_type} -> Int -> Ptr #{paren_type} -> Int -> IO ()
+gerc = C.#{abbrev}ger#{is_real ? "" : "c"}
+
+-- | Perform a rank-1 update of a Hermitian matrix.
+--
+--   > A ← α x y† + A
+--
+her :: Order -> Uplo -> Int -> #{real_type} -> Ptr #{paren_type} -> Int
+    -> Ptr #{paren_type} -> Int -> IO ()
+her = C.#{abbrev}#{ is_real ? "sy" : "he" }r
+
+-- | Perform a rank-1 update of a Hermitian packed matrix.
+--
+--   > A ← α x y† + A
+--
+hpr :: Order -> Uplo -> Int -> #{real_type} -> Ptr #{paren_type} -> Int
+    -> Ptr #{paren_type} -> IO ()
+hpr = C.#{abbrev}#{ is_real ? "s" : "h" }pr
+
+-- | Perform a rank-2 update of a Hermitian matrix.
+--
+--   > A ← α x y† + y (α x)† + A
+--
+her2 :: Order -> Uplo -> Int -> #{num_type} -> Ptr #{paren_type} -> Int
+     -> Ptr #{paren_type} -> Int -> Ptr #{paren_type} -> Int -> IO ()
+her2 = C.#{abbrev}#{ is_real ? "sy" : "he" }r2
+
+-- | Perform a rank-2 update of a Hermitian packed matrix.
+--
+--   > A ← α x y† + y (α x)† + A
+--
+hpr2 :: Order -> Uplo -> Int -> #{num_type} -> Ptr #{paren_type} -> Int
+     -> Ptr #{paren_type} -> Int -> Ptr #{paren_type} -> IO ()
+hpr2 = C.#{abbrev}#{ is_real ? "s" : "h" }pr2
+
+-- | Perform a general matrix-matrix update:
+--
+--   > C ← α T(A) U(B) + β C
+--
+gemm :: Order             -- ^ Layout of all the matrices.
+     -> Transpose         -- ^ The operation @T@ to be applied to @A@.
+     -> Transpose         -- ^ The operation @U@ to be applied to @B@.
+     -> Int               -- ^ Number of rows of @T(A)@ and @C@.
+     -> Int               -- ^ Number of columns of @U(B)@ and @C@.
+     -> Int               -- ^ Number of columns of @T(A)@ and
+                          --   number of rows of @U(B)@.
+     -> #{num_type}       -- ^ Scaling factor @α@ of the product.
+     -> Ptr #{paren_type} -- ^ Pointer to a matrix @A@.
+     -> Int               -- ^ Stride of the major dimension of @A@.
+     -> Ptr #{paren_type} -- ^ Pointer to a matrix @B@.
+     -> Int               -- ^ Stride of the major dimension of @B@.
+     -> #{num_type}       -- ^ Scaling factor @β@ of the original @C@.
+     -> Ptr #{paren_type} -- ^ Pointer to a mutable matrix @C@.
+     -> Int               -- ^ Stride of the major dimension of @C@.
+     -> IO ()
+gemm = C.#{abbrev}gemm
+
+-- | Perform a symmetric matrix-matrix update:
+--
+--   > C ← α A B + β C    or    C ← α B A + β C
+--
+--   where @A@ is symmetric.  The matrix @A@ must be in an unpacked format,
+--   although the routine will only access half of it as specified by the
+--   @'Uplo'@ argument.
+symm :: Order             -- ^ Layout of all the matrices.
+     -> Side              -- ^ Side that @A@ appears in the product.
+     -> Uplo              -- ^ The part of @A@ that is used.
+     -> Int               -- ^ Number of rows of @C@.
+     -> Int               -- ^ Number of columns of @C@.
+     -> #{num_type}       -- ^ Scaling factor @α@ of the product.
+     -> Ptr #{paren_type} -- ^ Pointer to a symmetric matrix @A@.
+     -> Int               -- ^ Stride of the major dimension of @A@.
+     -> Ptr #{paren_type} -- ^ Pointer to a matrix @B@.
+     -> Int               -- ^ Stride of the major dimension of @B@.
+     -> #{num_type}       -- ^ Scaling factor @α@ of the original @C@.
+     -> Ptr #{paren_type} -- ^ Pointer to a mutable matrix @C@.
+     -> Int               -- ^ Stride of the major dimension of @C@.
+     -> IO ()
+symm = C.#{abbrev}symm
+
+-- | Perform a symmetric rank-k update:
+--
+--   > C ← α A A⊤ + β C    or    C ← α A⊤ A + β C
+--
+syrk :: Order -> Uplo -> Transpose -> Int -> Int -> #{num_type}
+     -> Ptr #{paren_type} -> Int -> #{num_type} -> Ptr #{paren_type}
+     -> Int -> IO ()
+syrk = C.#{abbrev}syrk
+
+-- | Perform a symmetric rank-2k update:
+--
+--   > C ← α A B⊤ + α* B A⊤ + β C    or    C ← α A⊤ B + α* B⊤ A + β C
+--
+syr2k :: Order -> Uplo -> Transpose -> Int -> Int -> #{num_type}
+      -> Ptr #{paren_type} -> Int -> Ptr #{paren_type} -> Int -> #{num_type}
+      -> Ptr #{paren_type} -> Int -> IO ()
+syr2k = C.#{abbrev}syr2k
+
+-- | Perform a Hermitian matrix-matrix update:
+--
+--   > C ← α A B + β C    or    C ← α B A + β C
+--
+--   where @A@ is Hermitian.  The matrix @A@ must be in an unpacked format,
+--   although the routine will only access half of it as specified by the
+--   @'Uplo'@ argument.
+hemm :: Order             -- ^ Layout of all the matrices.
+     -> Side              -- ^ Side that @A@ appears in the product.
+     -> Uplo              -- ^ The part of @A@ that is used.
+     -> Int               -- ^ Number of rows of @C@.
+     -> Int               -- ^ Number of columns of @C@.
+     -> #{num_type}       -- ^ Scaling factor @α@ of the product.
+     -> Ptr #{paren_type} -- ^ Pointer to a Hermitian matrix @A@.
+     -> Int               -- ^ Stride of the major dimension of @A@.
+     -> Ptr #{paren_type} -- ^ Pointer to a matrix @B@.
+     -> Int               -- ^ Stride of the major dimension of @B@.
+     -> #{num_type}       -- ^ Scaling factor @α@ of the original @C@.
+     -> Ptr #{paren_type} -- ^ Pointer to a mutable matrix @C@.
+     -> Int               -- ^ Stride of the major dimension of @C@.
+     -> IO ()
+hemm = C.#{abbrev}#{ is_real ? "sy" : "he" }mm
+
+-- | Perform a Hermitian rank-k update:
+--
+--   > C ← α A A† + β C    or    C ← α A† A + β C
+--
+herk :: Order -> Uplo -> Transpose -> Int -> Int -> #{real_type}
+     -> Ptr #{paren_type} -> Int -> #{real_type} -> Ptr #{paren_type}
+     -> Int -> IO ()
+herk = C.#{abbrev}#{ is_real ? "sy" : "he" }rk
+
+-- | Perform a Hermitian rank-2k update:
+--
+--   > C ← α A B† + α* B A† + β C    or    C ← α A† B + α* B† A + β C
+--
+her2k :: Order -> Uplo -> Transpose -> Int -> Int -> #{num_type}
+      -> Ptr #{paren_type} -> Int -> Ptr #{paren_type} -> Int -> #{real_type}
+      -> Ptr #{paren_type} -> Int -> IO ()
+her2k = C.#{abbrev}#{ is_real ? "sy" : "he" }r2k
+
+-- | Perform a triangular matrix-matrix multiplication:
+--
+--   > B ← α T(A) B    or    B ← α B T(A)
+--
+--   where @A@ is triangular.
+trmm :: Order -> Side -> Uplo -> Transpose -> Diag -> Int -> Int
+     -> #{num_type} -> Ptr #{paren_type} -> Int -> Ptr #{paren_type}
+     -> Int -> IO ()
+trmm = C.#{abbrev}trmm
+
+-- | Perform an inverse triangular matrix-matrix multiplication:
+--
+--   > B ← α T(A⁻¹) B    or    B ← α B T(A⁻¹)
+--
+--   where @A@ is triangular.
+trsm :: Order -> Side -> Uplo -> Transpose -> Diag -> Int -> Int -> #{num_type}
+     -> Ptr #{paren_type} -> Int -> Ptr #{paren_type} -> Int -> IO ()
+trsm = C.#{abbrev}trsm
+
+#{ if num_type == "Float" then "
+-- | Calculate the dot product of two vectors with extended precision
+--   accumulation of the intermediate results and add a scalar value to
+--   the result.  (Only available for the @'Float'@ type.)
+sdsdot :: Int -> #{num_type} -> Ptr #{num_type} -> Int -> Ptr #{num_type}
+       -> Int -> IO #{num_type}
+sdsdot = C.sdsdot
+" end }
+
+#{ if num_type == "Double" then "
+-- | Calculate the dot product of two vectors with extended precision
+--   accumulation of the intermediate results and return a double-precision
+--   result.  (Only available in the @Double@ module.)
+dsdot :: Int -> Ptr Float -> Int -> Ptr Float -> Int -> IO Double
+dsdot = C.dsdot
+" end }
+
+#{ if is_real then
+<<END
+
+-- | Generate a Givens rotation.
+--   (Only available for real floating-point types.)
+rotg :: Ptr #{paren_type} -> Ptr #{paren_type} -> Ptr #{paren_type}
+     -> Ptr #{paren_type} -> IO ()
+rotg  = C.#{abbrev}rotg
+
+-- | Generate a modified Givens rotation.
+--   (Only available for real floating-point types.)
+rotmg :: Ptr #{paren_type} -> Ptr #{paren_type} -> Ptr #{paren_type}
+      -> #{num_type} -> Ptr #{paren_type} -> IO ()
+rotmg = C.#{abbrev}rotmg
+
+-- | Apply a Givens rotation.
+--   (Only available for real floating-point types.)
+rot :: Int -> Ptr #{paren_type} -> Int -> Ptr #{paren_type} -> Int
+    -> #{num_type} -> #{num_type} -> IO ()
+rot   = C.#{abbrev}rot
+
+-- | Apply a modified Givens rotation.
+--   (Only available for real floating-point types.)
+rotm :: Int -> Ptr #{paren_type} -> Int -> Ptr #{paren_type} -> Int
+     -> Ptr #{paren_type} -> IO ()
+rotm  = C.#{abbrev}rotm
+
+END
+end }
+
+END
+  end
+end }
