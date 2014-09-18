@@ -1,43 +1,18 @@
 {-# LANGUAGE Rank2Types #-}
-module MainTest (tests) where
 import Control.Monad.ST (RealWorld)
 import Data.Complex (Complex)
 import Data.Vector.Storable (MVector(MVector))
-import Distribution.TestSuite
-  ( Progress(Finished)
-  , Result(Fail, Pass)
-  , Test(Test)
-  , TestInstance(TestInstance)
-  )
 import Foreign (Ptr, Storable, withForeignPtr)
 import Text.Printf (printf)
 import Blas.Generic.Unsafe (Numeric)
-import qualified Data.Vector.Generic.Mutable as MVector
 import qualified Data.Vector.Storable as Vector
-import qualified Distribution.TestSuite as Test
 import qualified Blas.Primitive.Types as Blas
 import qualified Blas.Generic.Unsafe as Blas
+import qualified TestUtils as T
 
-tests :: IO [Test]
-tests =
-  return $
-  mapNumericTypes (simpleTest "gemm test" . testGemm)
-
-simpleTest :: String -> IO Progress -> Test
-simpleTest name action = Test test
-  where test = TestInstance
-               { Test.run = action
-               , Test.name = name
-               , Test.tags = []
-               , Test.options = []
-               , Test.setOption = \_ _ -> Right test
-               }
-
-passT :: IO Progress
-passT = return $ Finished Pass
-
-failT :: String -> IO Progress
-failT = return . Finished .Fail
+main :: IO ()
+main = T.runTest $ do
+  sequence_ (mapNumericTypes testGemm)
 
 mapNumericTypes :: (forall a. (Eq a, Numeric a, Show a) => a -> b) -> [b]
 mapNumericTypes f =
@@ -56,7 +31,7 @@ withMVector (MVector _ foreignPtr) = withForeignPtr foreignPtr
 mVectorFromList :: Storable a => [a] -> IO (MVector RealWorld a)
 mVectorFromList = Vector.thaw . Vector.fromList
 
-testGemm :: (Eq a, Numeric a, Show a) => a -> IO Progress
+testGemm :: (Eq a, Numeric a, Show a) => a -> T.Test ()
 testGemm numType = do
   let order    = Blas.RowMajor
       transa   = Blas.NoTrans
@@ -69,15 +44,15 @@ testGemm numType = do
       b        = Vector.fromList [1, 2, 3, 5]
       expected = Vector.fromList [5, 13, 11, 29]
 
-  c <- mVectorFromList $ take size (repeat 0)
+  c' <- T.liftIO $ do
+    c <- mVectorFromList $ take size (repeat 0)
+    Vector.unsafeWith a $ \ pa ->
+      Vector.unsafeWith b $ \ pb ->
+        withMVector c $ \ pc ->
+          Blas.gemm order transa transb n n n alpha pa n pb n beta pc n
+    Vector.freeze c
 
-  Vector.unsafeWith a $ \ pa ->
-    Vector.unsafeWith b $ \ pb ->
-      withMVector c $ \ pc ->
-        Blas.gemm order transa transb n n n alpha pa n pb n beta pc n
-
-  c' <- Vector.freeze c
   if c' == expected
-    then passT
-    else failT $ printf "result does not match: %s != %s"
-                        (show c') (show expected)
+    then T.passTest "testGemm"
+    else T.failTest $ printf "testGemm: c' does not match: %s != %s"
+                      (show c') (show expected)

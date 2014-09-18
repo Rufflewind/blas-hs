@@ -8,10 +8,6 @@ before_install:
   - cabal update
 install:
   - sudo apt-get install -y libblas-dev
-    # Cabal for GHC 7.4 is too ancient
-  - if ghc -V | grep 7.4; then cabal install cabal-install; fi
-    # for some reason this has to be done after cabal-install is installed
-  - export PATH="$HOME/.cabal/bin:$PATH"
   - cabal install --enable-tests --only-dependencies
 script:
   - cabal configure -v --enable-tests
