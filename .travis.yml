@@ -12,7 +12,10 @@ install:
 script:
   - cabal configure -v --enable-tests
   - cabal build
-  - cabal test
+  - cabal test --show-details always
+    # cabal-install 0.14 doesn't have `--show-details streaming`
   - cabal check
   - cabal sdist
-  - cabal install dist/*.tar.gz
+    # --run-tests did not exist until ~0.18
+  - cabal install --enable-tests --run-tests dist/*.tar.gz ||
+    cabal install --enable-tests             dist/*.tar.gz
