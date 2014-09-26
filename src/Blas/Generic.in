@@ -30,14 +30,16 @@ Blas, which is slightly different.
 module Blas.#{name}.#{safety}
        ( Numeric(..)
        , RealNumeric(..)
-       , C.dsdot
-       , C.sdsdot
+       , D.dsdot
+       , S.sdsdot
        ) where
-import Data.Complex (Complex((:+)))
+import Data.Complex (Complex)
 import Foreign (Ptr, Storable)
-import FFI (getReturnValue)
 import Blas.Primitive.Types (Order, Transpose, Uplo, Diag, Side)
-import qualified Blas.Primitive.#{safety} as C
+import qualified Blas.Specialized.Float.#{safety} as S
+import qualified Blas.Specialized.Double.#{safety} as D
+import qualified Blas.Specialized.ComplexFloat.#{safety} as C
+import qualified Blas.Specialized.ComplexDouble.#{safety} as Z
 
 -- | Blas operations that are applicable to real and complex numbers.
 --
@@ -148,170 +150,65 @@ class Numeric a => RealNumeric a where
   rot   :: Int -> Ptr a -> Int -> Ptr a -> Int -> a -> a -> IO ()
   rotm  :: Int -> Ptr a -> Int -> Ptr a -> Int -> Ptr a -> IO ()
 
-instance Numeric Float where
-  type RealType Float = Float
-  dotu  = C.sdot
-  dotc  = C.sdot
-  nrm2  = C.snrm2
-  asum  = C.sasum
-  iamax = C.isamax
-  swap  = C.sswap
-  copy  = C.scopy
-  axpy  = C.saxpy
-  scal  = C.sscal
-  gemv  = C.sgemv
-  gbmv  = C.sgbmv
-  trmv  = C.strmv
-  tbmv  = C.stbmv
-  tpmv  = C.stpmv
-  trsv  = C.strsv
-  tbsv  = C.stbsv
-  tpsv  = C.stpsv
-  hemv  = C.ssymv
-  hbmv  = C.ssbmv
-  hpmv  = C.sspmv
-  geru  = C.sger
-  gerc  = C.sger
-  her   = C.ssyr
-  hpr   = C.sspr
-  her2  = C.ssyr2
-  hpr2  = C.sspr2
-  gemm  = C.sgemm
-  symm  = C.ssymm
-  hemm  = C.ssymm
-  syrk  = C.ssyrk
-  herk  = C.ssyrk
-  syr2k = C.ssyr2k
-  her2k = C.ssyr2k
-  trmm  = C.strmm
-  trsm  = C.strsm
+#{ [
+  ["Float", "Float", "s"],
+  ["Double", "Double", "d"],
+  ["Complex Float", "Float", "c"],
+  ["Complex Double", "Double", "z"],
+].map do |num_type, real_type, abbrev|
+  paren_type = (num_type.include? " ") ? "(" + num_type + ")" : num_type
+  is_real    = real_type == num_type
+  <<END
 
-instance RealNumeric Float where
-  rotg  = C.srotg
-  rotmg = C.srotmg
-  rot   = C.srot
-  rotm  = C.srotm
+#{ if is_real then <<END
+instance RealNumeric #{paren_type} where
+  rotg  = #{abbrev.upcase}.rotg
+  rotmg = #{abbrev.upcase}.rotmg
+  rot   = #{abbrev.upcase}.rot
+  rotm  = #{abbrev.upcase}.rotm
+END
+end }
 
-instance Numeric Double where
-  type RealType Double = Double
-  dotu  = C.ddot
-  dotc  = C.ddot
-  nrm2  = C.dnrm2
-  asum  = C.dasum
-  iamax = C.idamax
-  swap  = C.dswap
-  copy  = C.dcopy
-  axpy  = C.daxpy
-  scal  = C.dscal
-  gemv  = C.dgemv
-  gbmv  = C.dgbmv
-  trmv  = C.dtrmv
-  tbmv  = C.dtbmv
-  tpmv  = C.dtpmv
-  trsv  = C.dtrsv
-  tbsv  = C.dtbsv
-  tpsv  = C.dtpsv
-  hemv  = C.dsymv
-  hbmv  = C.dsbmv
-  hpmv  = C.dspmv
-  geru  = C.dger
-  gerc  = C.dger
-  her   = C.dsyr
-  hpr   = C.dspr
-  her2  = C.dsyr2
-  hpr2  = C.dspr2
-  gemm  = C.dgemm
-  symm  = C.dsymm
-  hemm  = C.dsymm
-  syrk  = C.dsyrk
-  herk  = C.dsyrk
-  syr2k = C.dsyr2k
-  her2k = C.dsyr2k
-  trmm  = C.dtrmm
-  trsm  = C.dtrsm
+instance Numeric #{paren_type} where
+  type RealType #{paren_type} = #{real_type}
+  dotu  = #{abbrev.upcase}.dotu
+  dotc  = #{abbrev.upcase}.dotc
+  nrm2  = #{abbrev.upcase}.nrm2
+  asum  = #{abbrev.upcase}.asum
+  iamax = #{abbrev.upcase}.iamax
+  swap  = #{abbrev.upcase}.swap
+  copy  = #{abbrev.upcase}.copy
+  axpy  = #{abbrev.upcase}.axpy
+  scal  = #{abbrev.upcase}.scal
+  gemv  = #{abbrev.upcase}.gemv
+  gbmv  = #{abbrev.upcase}.gbmv
+  trmv  = #{abbrev.upcase}.trmv
+  tbmv  = #{abbrev.upcase}.tbmv
+  tpmv  = #{abbrev.upcase}.tpmv
+  trsv  = #{abbrev.upcase}.trsv
+  tbsv  = #{abbrev.upcase}.tbsv
+  tpsv  = #{abbrev.upcase}.tpsv
+  hemv  = #{abbrev.upcase}.hemv
+  hbmv  = #{abbrev.upcase}.hbmv
+  hpmv  = #{abbrev.upcase}.hpmv
+  geru  = #{abbrev.upcase}.geru
+  gerc  = #{abbrev.upcase}.gerc
+  her   = #{abbrev.upcase}.her
+  hpr   = #{abbrev.upcase}.hpr
+  her2  = #{abbrev.upcase}.her2
+  hpr2  = #{abbrev.upcase}.hpr2
+  gemm  = #{abbrev.upcase}.gemm
+  symm  = #{abbrev.upcase}.symm
+  hemm  = #{abbrev.upcase}.hemm
+  syrk  = #{abbrev.upcase}.syrk
+  herk  = #{abbrev.upcase}.herk
+  syr2k = #{abbrev.upcase}.syr2k
+  her2k = #{abbrev.upcase}.her2k
+  trmm  = #{abbrev.upcase}.trmm
+  trsm  = #{abbrev.upcase}.trsm
 
-instance RealNumeric Double where
-  rotg  = C.drotg
-  rotmg = C.drotmg
-  rot   = C.drot
-  rotm  = C.drotm
+END
+end.join("") }
 
-instance Numeric (Complex Float) where
-  type RealType (Complex Float) = Float
-  dotu a b c d e = getReturnValue (C.cdotu_sub a b c d e)
-  dotc a b c d e = getReturnValue (C.cdotc_sub a b c d e)
-  nrm2  = C.scnrm2
-  asum  = C.scasum
-  iamax = C.icamax
-  swap  = C.cswap
-  copy  = C.ccopy
-  axpy  = C.caxpy
-  scal n (alpha :+ 0) = C.csscal n alpha
-  scal n  alpha       = C.cscal  n alpha
-  gemv  = C.cgemv
-  gbmv  = C.cgbmv
-  trmv  = C.ctrmv
-  tbmv  = C.ctbmv
-  tpmv  = C.ctpmv
-  trsv  = C.ctrsv
-  tbsv  = C.ctbsv
-  tpsv  = C.ctpsv
-  hemv  = C.chemv
-  hbmv  = C.chbmv
-  hpmv  = C.chpmv
-  geru  = C.cgeru
-  gerc  = C.cgerc
-  her   = C.cher
-  hpr   = C.chpr
-  her2  = C.cher2
-  hpr2  = C.chpr2
-  gemm  = C.cgemm
-  symm  = C.csymm
-  hemm  = C.chemm
-  syrk  = C.csyrk
-  herk  = C.cherk
-  syr2k = C.csyr2k
-  her2k = C.cher2k
-  trmm  = C.ctrmm
-  trsm  = C.ctrsm
-
-instance Numeric (Complex Double) where
-  type RealType (Complex Double) = Double
-  dotu a b c d e = getReturnValue (C.zdotu_sub a b c d e)
-  dotc a b c d e = getReturnValue (C.zdotc_sub a b c d e)
-  nrm2  = C.dznrm2
-  asum  = C.dzasum
-  iamax = C.izamax
-  swap  = C.zswap
-  copy  = C.zcopy
-  axpy  = C.zaxpy
-  scal n (alpha :+ 0) = C.zdscal n alpha
-  scal n  alpha       = C.zscal  n alpha
-  gemv  = C.zgemv
-  gbmv  = C.zgbmv
-  trmv  = C.ztrmv
-  tbmv  = C.ztbmv
-  tpmv  = C.ztpmv
-  trsv  = C.ztrsv
-  tbsv  = C.ztbsv
-  tpsv  = C.ztpsv
-  hemv  = C.zhemv
-  hbmv  = C.zhbmv
-  hpmv  = C.zhpmv
-  geru  = C.zgeru
-  gerc  = C.zgerc
-  her   = C.zher
-  hpr   = C.zhpr
-  her2  = C.zher2
-  hpr2  = C.zhpr2
-  gemm  = C.zgemm
-  symm  = C.zsymm
-  hemm  = C.zhemm
-  syrk  = C.zsyrk
-  herk  = C.zherk
-  syr2k = C.zsyr2k
-  her2k = C.zher2k
-  trmm  = C.ztrmm
-  trsm  = C.ztrsm
 END
 end }

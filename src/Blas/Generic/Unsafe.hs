@@ -24,14 +24,16 @@ Blas, which is slightly different.
 module Blas.Generic.Unsafe
        ( Numeric(..)
        , RealNumeric(..)
-       , C.dsdot
-       , C.sdsdot
+       , D.dsdot
+       , S.sdsdot
        ) where
-import Data.Complex (Complex((:+)))
+import Data.Complex (Complex)
 import Foreign (Ptr, Storable)
-import FFI (getReturnValue)
 import Blas.Primitive.Types (Order, Transpose, Uplo, Diag, Side)
-import qualified Blas.Primitive.Unsafe as C
+import qualified Blas.Specialized.Float.Unsafe as S
+import qualified Blas.Specialized.Double.Unsafe as D
+import qualified Blas.Specialized.ComplexFloat.Unsafe as C
+import qualified Blas.Specialized.ComplexDouble.Unsafe as Z
 
 -- | Blas operations that are applicable to real and complex numbers.
 --
@@ -142,168 +144,179 @@ class Numeric a => RealNumeric a where
   rot   :: Int -> Ptr a -> Int -> Ptr a -> Int -> a -> a -> IO ()
   rotm  :: Int -> Ptr a -> Int -> Ptr a -> Int -> Ptr a -> IO ()
 
-instance Numeric Float where
-  type RealType Float = Float
-  dotu  = C.sdot
-  dotc  = C.sdot
-  nrm2  = C.snrm2
-  asum  = C.sasum
-  iamax = C.isamax
-  swap  = C.sswap
-  copy  = C.scopy
-  axpy  = C.saxpy
-  scal  = C.sscal
-  gemv  = C.sgemv
-  gbmv  = C.sgbmv
-  trmv  = C.strmv
-  tbmv  = C.stbmv
-  tpmv  = C.stpmv
-  trsv  = C.strsv
-  tbsv  = C.stbsv
-  tpsv  = C.stpsv
-  hemv  = C.ssymv
-  hbmv  = C.ssbmv
-  hpmv  = C.sspmv
-  geru  = C.sger
-  gerc  = C.sger
-  her   = C.ssyr
-  hpr   = C.sspr
-  her2  = C.ssyr2
-  hpr2  = C.sspr2
-  gemm  = C.sgemm
-  symm  = C.ssymm
-  hemm  = C.ssymm
-  syrk  = C.ssyrk
-  herk  = C.ssyrk
-  syr2k = C.ssyr2k
-  her2k = C.ssyr2k
-  trmm  = C.strmm
-  trsm  = C.strsm
 
 instance RealNumeric Float where
-  rotg  = C.srotg
-  rotmg = C.srotmg
-  rot   = C.srot
-  rotm  = C.srotm
+  rotg  = S.rotg
+  rotmg = S.rotmg
+  rot   = S.rot
+  rotm  = S.rotm
+
+
+instance Numeric Float where
+  type RealType Float = Float
+  dotu  = S.dotu
+  dotc  = S.dotc
+  nrm2  = S.nrm2
+  asum  = S.asum
+  iamax = S.iamax
+  swap  = S.swap
+  copy  = S.copy
+  axpy  = S.axpy
+  scal  = S.scal
+  gemv  = S.gemv
+  gbmv  = S.gbmv
+  trmv  = S.trmv
+  tbmv  = S.tbmv
+  tpmv  = S.tpmv
+  trsv  = S.trsv
+  tbsv  = S.tbsv
+  tpsv  = S.tpsv
+  hemv  = S.hemv
+  hbmv  = S.hbmv
+  hpmv  = S.hpmv
+  geru  = S.geru
+  gerc  = S.gerc
+  her   = S.her
+  hpr   = S.hpr
+  her2  = S.her2
+  hpr2  = S.hpr2
+  gemm  = S.gemm
+  symm  = S.symm
+  hemm  = S.hemm
+  syrk  = S.syrk
+  herk  = S.herk
+  syr2k = S.syr2k
+  her2k = S.her2k
+  trmm  = S.trmm
+  trsm  = S.trsm
+
+
+instance RealNumeric Double where
+  rotg  = D.rotg
+  rotmg = D.rotmg
+  rot   = D.rot
+  rotm  = D.rotm
+
 
 instance Numeric Double where
   type RealType Double = Double
-  dotu  = C.ddot
-  dotc  = C.ddot
-  nrm2  = C.dnrm2
-  asum  = C.dasum
-  iamax = C.idamax
-  swap  = C.dswap
-  copy  = C.dcopy
-  axpy  = C.daxpy
-  scal  = C.dscal
-  gemv  = C.dgemv
-  gbmv  = C.dgbmv
-  trmv  = C.dtrmv
-  tbmv  = C.dtbmv
-  tpmv  = C.dtpmv
-  trsv  = C.dtrsv
-  tbsv  = C.dtbsv
-  tpsv  = C.dtpsv
-  hemv  = C.dsymv
-  hbmv  = C.dsbmv
-  hpmv  = C.dspmv
-  geru  = C.dger
-  gerc  = C.dger
-  her   = C.dsyr
-  hpr   = C.dspr
-  her2  = C.dsyr2
-  hpr2  = C.dspr2
-  gemm  = C.dgemm
-  symm  = C.dsymm
-  hemm  = C.dsymm
-  syrk  = C.dsyrk
-  herk  = C.dsyrk
-  syr2k = C.dsyr2k
-  her2k = C.dsyr2k
-  trmm  = C.dtrmm
-  trsm  = C.dtrsm
+  dotu  = D.dotu
+  dotc  = D.dotc
+  nrm2  = D.nrm2
+  asum  = D.asum
+  iamax = D.iamax
+  swap  = D.swap
+  copy  = D.copy
+  axpy  = D.axpy
+  scal  = D.scal
+  gemv  = D.gemv
+  gbmv  = D.gbmv
+  trmv  = D.trmv
+  tbmv  = D.tbmv
+  tpmv  = D.tpmv
+  trsv  = D.trsv
+  tbsv  = D.tbsv
+  tpsv  = D.tpsv
+  hemv  = D.hemv
+  hbmv  = D.hbmv
+  hpmv  = D.hpmv
+  geru  = D.geru
+  gerc  = D.gerc
+  her   = D.her
+  hpr   = D.hpr
+  her2  = D.her2
+  hpr2  = D.hpr2
+  gemm  = D.gemm
+  symm  = D.symm
+  hemm  = D.hemm
+  syrk  = D.syrk
+  herk  = D.herk
+  syr2k = D.syr2k
+  her2k = D.her2k
+  trmm  = D.trmm
+  trsm  = D.trsm
 
-instance RealNumeric Double where
-  rotg  = C.drotg
-  rotmg = C.drotmg
-  rot   = C.drot
-  rotm  = C.drotm
+
+
 
 instance Numeric (Complex Float) where
   type RealType (Complex Float) = Float
-  dotu a b c d e = getReturnValue (C.cdotu_sub a b c d e)
-  dotc a b c d e = getReturnValue (C.cdotc_sub a b c d e)
-  nrm2  = C.scnrm2
-  asum  = C.scasum
-  iamax = C.icamax
-  swap  = C.cswap
-  copy  = C.ccopy
-  axpy  = C.caxpy
-  scal n (alpha :+ 0) = C.csscal n alpha
-  scal n  alpha       = C.cscal  n alpha
-  gemv  = C.cgemv
-  gbmv  = C.cgbmv
-  trmv  = C.ctrmv
-  tbmv  = C.ctbmv
-  tpmv  = C.ctpmv
-  trsv  = C.ctrsv
-  tbsv  = C.ctbsv
-  tpsv  = C.ctpsv
-  hemv  = C.chemv
-  hbmv  = C.chbmv
-  hpmv  = C.chpmv
-  geru  = C.cgeru
-  gerc  = C.cgerc
-  her   = C.cher
-  hpr   = C.chpr
-  her2  = C.cher2
-  hpr2  = C.chpr2
-  gemm  = C.cgemm
-  symm  = C.csymm
-  hemm  = C.chemm
-  syrk  = C.csyrk
-  herk  = C.cherk
-  syr2k = C.csyr2k
-  her2k = C.cher2k
-  trmm  = C.ctrmm
-  trsm  = C.ctrsm
+  dotu  = C.dotu
+  dotc  = C.dotc
+  nrm2  = C.nrm2
+  asum  = C.asum
+  iamax = C.iamax
+  swap  = C.swap
+  copy  = C.copy
+  axpy  = C.axpy
+  scal  = C.scal
+  gemv  = C.gemv
+  gbmv  = C.gbmv
+  trmv  = C.trmv
+  tbmv  = C.tbmv
+  tpmv  = C.tpmv
+  trsv  = C.trsv
+  tbsv  = C.tbsv
+  tpsv  = C.tpsv
+  hemv  = C.hemv
+  hbmv  = C.hbmv
+  hpmv  = C.hpmv
+  geru  = C.geru
+  gerc  = C.gerc
+  her   = C.her
+  hpr   = C.hpr
+  her2  = C.her2
+  hpr2  = C.hpr2
+  gemm  = C.gemm
+  symm  = C.symm
+  hemm  = C.hemm
+  syrk  = C.syrk
+  herk  = C.herk
+  syr2k = C.syr2k
+  her2k = C.her2k
+  trmm  = C.trmm
+  trsm  = C.trsm
+
+
+
 
 instance Numeric (Complex Double) where
   type RealType (Complex Double) = Double
-  dotu a b c d e = getReturnValue (C.zdotu_sub a b c d e)
-  dotc a b c d e = getReturnValue (C.zdotc_sub a b c d e)
-  nrm2  = C.dznrm2
-  asum  = C.dzasum
-  iamax = C.izamax
-  swap  = C.zswap
-  copy  = C.zcopy
-  axpy  = C.zaxpy
-  scal n (alpha :+ 0) = C.zdscal n alpha
-  scal n  alpha       = C.zscal  n alpha
-  gemv  = C.zgemv
-  gbmv  = C.zgbmv
-  trmv  = C.ztrmv
-  tbmv  = C.ztbmv
-  tpmv  = C.ztpmv
-  trsv  = C.ztrsv
-  tbsv  = C.ztbsv
-  tpsv  = C.ztpsv
-  hemv  = C.zhemv
-  hbmv  = C.zhbmv
-  hpmv  = C.zhpmv
-  geru  = C.zgeru
-  gerc  = C.zgerc
-  her   = C.zher
-  hpr   = C.zhpr
-  her2  = C.zher2
-  hpr2  = C.zhpr2
-  gemm  = C.zgemm
-  symm  = C.zsymm
-  hemm  = C.zhemm
-  syrk  = C.zsyrk
-  herk  = C.zherk
-  syr2k = C.zsyr2k
-  her2k = C.zher2k
-  trmm  = C.ztrmm
-  trsm  = C.ztrsm
+  dotu  = Z.dotu
+  dotc  = Z.dotc
+  nrm2  = Z.nrm2
+  asum  = Z.asum
+  iamax = Z.iamax
+  swap  = Z.swap
+  copy  = Z.copy
+  axpy  = Z.axpy
+  scal  = Z.scal
+  gemv  = Z.gemv
+  gbmv  = Z.gbmv
+  trmv  = Z.trmv
+  tbmv  = Z.tbmv
+  tpmv  = Z.tpmv
+  trsv  = Z.trsv
+  tbsv  = Z.tbsv
+  tpsv  = Z.tpsv
+  hemv  = Z.hemv
+  hbmv  = Z.hbmv
+  hpmv  = Z.hpmv
+  geru  = Z.geru
+  gerc  = Z.gerc
+  her   = Z.her
+  hpr   = Z.hpr
+  her2  = Z.her2
+  hpr2  = Z.hpr2
+  gemm  = Z.gemm
+  symm  = Z.symm
+  hemm  = Z.hemm
+  syrk  = Z.syrk
+  herk  = Z.herk
+  syr2k = Z.syr2k
+  her2k = Z.her2k
+  trmm  = Z.trmm
+  trsm  = Z.trsm
+
+
+
