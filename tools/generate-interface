@@ -1,0 +1,645 @@
+#!/usr/bin/env runhaskell
+-- -*- haskell -*-
+{-# LANGUAGE OverloadedStrings #-}
+module Main (main) where
+import Prelude ()
+import Data.String (IsString(fromString))
+import Common
+
+data Interface = Generic
+               | Specialized
+               deriving (Bounded, Enum, Eq, Ord, Read, Show)
+
+data Type t = Val t
+            | Ptr t
+            | Type String
+            deriving (Eq, Ord, Read, Show)
+
+instance IsString (Type t) where
+  fromString = Type
+
+class Eq t => NumTypeVar t where
+  fromNumType :: NumType -> t
+  abbrev      :: t -> String
+  realType    :: t -> t
+  showNumType :: NumClass -> t -> String
+
+data NumType = Float
+             | Double
+             | ComplexFloat
+             | ComplexDouble
+             deriving (Bounded, Enum, Eq, Ord, Read, Show)
+
+instance NumTypeVar NumType where
+  fromNumType                 = id
+  abbrev        Float         = "s"
+  abbrev        Double        = "d"
+  abbrev        ComplexFloat  = "c"
+  abbrev        ComplexDouble = "z"
+  realType      ComplexFloat  = Float
+  realType      ComplexDouble = Double
+  realType      Float         = Float
+  realType      Double        = Double
+  showNumType _ Float         = "Float"
+  showNumType _ Double        = "Double"
+  showNumType _ ComplexFloat  = "Complex Float"
+  showNumType _ ComplexDouble = "Complex Double"
+
+data NumClass = Numeric
+              | RealNumeric
+              | Unique NumType
+              deriving (Eq, Ord, Read, Show)
+
+instance NumTypeVar NumClass where
+  fromNumType                         = Unique
+  abbrev                  c           = printf "[%s]"
+                                        (mconcat (abbrev <$> numTypes c))
+  realType                Numeric     = RealNumeric
+  realType                RealNumeric = RealNumeric
+  realType                (Unique t)  = Unique (realType t)
+  showNumType Numeric     RealNumeric = "RealType a"
+  showNumType _           Numeric     = "a"
+  showNumType _           RealNumeric = "a"
+  showNumType _           (Unique t)  = showNumType' t
+
+data Group b a = Group b [Group b a]
+               | Elem a
+               deriving (Eq, Ord, Read, Show)
+
+data Function t = Function
+                  { fName          :: String
+                  , fClass         :: NumClass
+                  , fDocumentation :: [String]
+                  , fArgTypes      :: [(Type t, String)]
+                  , fRetType       :: Type t
+                  , fDefinitions   :: [String]
+                  } deriving (Eq, Ord, Read, Show)
+
+isReal :: NumTypeVar t => t -> Bool
+isReal t = realType t == t
+
+numTypes :: NumClass -> [NumType]
+numTypes Numeric     = [minBound .. maxBound]
+numTypes RealNumeric = filter isReal (numTypes Numeric)
+numTypes (Unique t)  = [t]
+
+autoParens :: String -> String
+autoParens s = if ' ' `elem` s then "(" <> s <> ")" else s
+
+showType :: NumTypeVar t => NumClass -> Type t -> String
+showType cls (Ptr t)  = "Ptr " <> autoParens (showNumType cls t)
+showType cls (Val t)  = showNumType cls t
+showType _   (Type s) = s
+
+showNumType' :: NumType -> String
+showNumType' = showNumType Numeric
+
+main :: IO ()
+main = forM_ [minBound .. maxBound] $ \ safety ->
+         forM_ [minBound .. maxBound] $ \ interface ->
+           writeInterface interface safety "../src/"
+
+writeInterface :: Interface -> Safety -> FilePath -> IO ()
+writeInterface interface safety = case interface of
+
+  Specialized -> \ prefix ->
+    forM_ (numTypes Numeric) $ \ t -> ($ prefix) $
+      writeModule ".hs" [] (name t) docs (exports t) (imps t) $
+      intercalate "\n\n" (specializedFunction <$> functionsByType t)
+    where name t = namePrefix <> [show interface, show t, show safety]
+          docs   = moduleDocs safety <>
+                   [ "/Since: 0.1.1/" ]
+          imps t = [ "Foreign (Ptr)" ] <>
+                      (if isReal t then [] else
+                         [ "Data.Complex (Complex((:+)))"
+                         , "FFI (getReturnValue)" ]) <>
+                      [ importTypes
+                      , printf "qualified Blas.Primitive.%s as C"
+                               (show safety) ]
+
+  Generic ->
+    writeModule ".hs" exts name docs exps imps $
+
+    -- class Numeric
+    mkDocs'
+    [ "Blas operations that are applicable to real and complex numbers."
+    , "Instances are defined for the 4 types supported by Blas: the " <>
+      "single- and double-precision floating point types and their " <>
+      "complex versions." ] <>
+    "class (Floating a, Storable a) => Numeric a where\n\n" <>
+    unlines (("  " <>) <$> mkDocs
+             [ "The corresponding real type of @a@."
+             , "In other words, @'RealType' ('Complex' a)@ is an alias for " <>
+               "@a@.  For everything else, @'RealType' a@ is simply @a@." ]) <>
+    "  type RealType a :: *\n" <>
+    unlines (classMethod Numeric <$> functionsByClass Numeric) <>
+
+    -- class RealNumeric
+    mkDocs'
+    [ "Blas operations that are only applicable to real numbers." ] <>
+    "class Numeric a => RealNumeric a where\n\n" <>
+    unlines (classMethod RealNumeric <$> functionsByClass RealNumeric) <>
+
+    -- instances
+    intercalate "\n\n" (instanceNumeric     <$> numTypes Numeric) <>
+    intercalate "\n\n" (instanceRealNumeric <$> numTypes RealNumeric)
+
+    where exts = [ "FlexibleInstances", "TypeFamilies" ]
+          name = namePrefix <> [ show interface, show safety ]
+          docs = moduleDocs safety
+          exps = ("  " <>) <$> mapHeadTail ("  " <>) (", " <>)
+                 [ "Numeric(..)", "RealNumeric(..)", "D.dsdot", "S.sdsdot" ]
+          imps = [ "Data.Complex (Complex)"
+                 , "Foreign (Ptr, Storable)"
+                 , importTypes ] <>
+                 [ printf "qualified Blas.Specialized.%s.%s as %s"
+                   (show t) (show safety) (toUpper <$> abbrev t)
+                 | t <- numTypes Numeric ]
+
+  where namePrefix = ["Blas"]
+
+importTypes :: String
+importTypes = "Blas.Primitive.Types (Order, Transpose, Uplo, Diag, Side)"
+
+instanceNumeric :: NumType -> String
+instanceNumeric t =
+  printf "instance Numeric %s where\n" parenT <>
+  printf "  type RealType %s = %s\n" parenT (showNumType' (realType t)) <>
+  unlines (instanceMethod t <$> functionsByClass Numeric)
+  where parenT = autoParens (showNumType' t)
+
+instanceRealNumeric :: NumType -> String
+instanceRealNumeric t =
+  printf "instance RealNumeric %s where\n" parenT <>
+  unlines (instanceMethod t <$> functionsByClass RealNumeric)
+  where parenT = autoParens (showNumType' t)
+
+functionsByClass :: NumClass -> [Function NumClass]
+functionsByClass cls = filter (\ fun -> fClass fun == cls) (functions cls)
+
+functionsByType :: NumType -> [Function NumType]
+functionsByType t = filter (\ fun -> t `elem` numTypes (fClass fun))
+                           (functions t)
+
+typeSignature :: NumTypeVar t => NumClass -> Function t -> [String]
+typeSignature cls fun = mapHeadTail ((name   <> " :: ") <>)
+                                    ((indent <> " -> ") <>)
+                                    (argTypes <> retType)
+  where name          = fName fun
+        indent        = take (length name) (repeat ' ')
+        docArg (t, d) = showType cls t <> if null d then "" else " -- ^ " <> d
+        argTypes      = docArg <$> fArgTypes fun
+        retType       = ["IO " <> autoParens (showType cls (fRetType fun))]
+
+classMethod :: NumClass -> Function NumClass -> String
+classMethod cls fun = unlines (("  " <>) <$> mkDocs (fDocumentation fun) <>
+                                             typeSignature cls fun)
+
+instanceMethod :: NumType -> Function NumClass -> String
+instanceMethod t fun = printf "  %s = %s.%s" name (toUpper <$> abbrev t) name
+  where name = fName fun
+
+specializedFunction :: Function NumType -> String
+specializedFunction fun = unlines (mkDocs (fDocumentation fun) <>
+                                   typeSignature Numeric fun <>
+                                   (wrapDef <$> fDefinitions fun))
+  where wrapDef s = fName fun <> " " <> s
+
+filterRight :: [Either b a] -> [a]
+filterRight []             = []
+filterRight (Right x : xs) = x : filterRight xs
+filterRight (Left  _ : xs) =     filterRight xs
+
+exports :: NumType -> [String]
+exports t = ("  " <>) <$> go True (flattenGroups 1 funs)
+  where go _     []                   = []
+        go first (Left (n, s) : rest) =         title n s : go first rest
+        go True  (Right fun   : rest) = "  " <> fName fun : go False rest
+        go False (Right fun   : rest) = ", " <> fName fun : go False rest
+        title    n                    = printf "-- %s %s" (take n (repeat '*'))
+        funs                          = filterGroups cond (groupedFunctions t)
+        cond     fun                  = t `elem` numTypes (fClass fun)
+
+filterGroups :: (a -> Bool) -> [Group b a] -> [Group b a]
+filterGroups _ []                       = []
+filterGroups f (g@(Elem x) : gs) | f x  = g : filterGroups f gs
+                                 | True = filterGroups f gs
+filterGroups f (Group x sgs : gs)       = case filterGroups f sgs of
+  []   -> filterGroups f gs
+  sgs' -> Group x sgs' : filterGroups f gs
+
+flattenGroups :: Int -> [Group b a] -> [Either (Int, b) a]
+flattenGroups _ []                 = []
+flattenGroups i (Elem  x     : gs) = Right x : flattenGroups i gs
+flattenGroups i (Group x sgs : gs) = Left (i, x) :
+                                     flattenGroups (succ i) sgs <>
+                                     flattenGroups i gs
+
+moduleDocs :: Safety -> [String]
+moduleDocs safety =
+  [ "Stability: Experimental"
+  , "Generic interface to Blas using " <> (toLower <$> show safety) <>
+    " foreign calls.  Refer to the GHC documentation for more information " <>
+    "regarding appropriate use of safe and unsafe foreign calls."
+  , "The functions here are named in a similar fashion to the original " <>
+    "Blas interface, with the type-dependent letter(s) removed.  Some " <>
+    "functions have been merged with others to allow the interface to " <>
+    "work on both real and complex numbers.  If you can't a particular " <>
+    "function, try looking for its corresponding complex equivalent (e.g. " <>
+    "@symv@ is a special case of 'hemv' applied to real numbers)."
+  , "Note: although complex versions of 'rot' and 'rotg' exist in many " <>
+    "implementations, they are not part of the official Blas standard and " <>
+    "therefore not included here.  If you /really/ need them, submit a " <>
+    "ticket so we can try to come up with a solution."
+  , "The documentation here is still incomplete.  Consult the " <>
+    "<http://netlib.org/blas/#_blas_routines official documentation> " <>
+    "for more information."
+  , "Notation:"
+  , unlines [ "  * @⋅@ denotes dot product (without any conjugation)."
+            , "  * @*@ denotes complex conjugation."
+            , "  * @⊤@ denotes transpose."
+            , "  * @†@ denotes conjugate transpose (Hermitian conjugate)." ]
+  , "Conventions:"
+  , unlines [ "  * All scalars are denoted with lowercase Greek letters"
+            , "  * All vectors are denoted with lowercase Latin letters and are"
+            , "    assumed to be column vectors (unless transposed)."
+            , "  * All matrices are denoted with uppercase Latin letters." ]
+  ]
+
+functions :: NumTypeVar t => t -> [Function t]
+functions = filterRight . flattenGroups 0 . groupedFunctions
+
+groupedFunctions :: NumTypeVar t => t -> [Group String (Function t)]
+groupedFunctions t =
+  [ Group "Level 1: vector-vector operations" $
+    [ Group "Givens rotations" $ Elem <$>
+
+      [ function "rotg" RealNumeric
+        [ "Generate a Givens rotation. (Only available for real " <>
+          "floating-point types.)" ]
+        [ Ptr t, Ptr t, Ptr t, Ptr t ] "()"
+        [ printf "= C.%srotg" abbr ]
+
+      , function "rotmg" RealNumeric
+        [ "Generate a modified Givens rotation. (Only available for real " <>
+          "floating-point types.)" ]
+        [ Ptr t, Ptr t, Ptr t, Val t, Ptr t ] "()"
+        [ printf "= C.%srotmg" abbr ]
+
+      , function "rot" RealNumeric
+        [ "Apply a Givens rotation. (Only available for real " <>
+          "floating-point types.)" ]
+        [ "Int", Ptr t, "Int", Ptr t, "Int", Val t, Val t ] "()"
+        [ printf "= C.%srot" abbr ]
+
+      , function "rotm" RealNumeric
+        [ "Apply a modified Givens rotation. (Only available for real " <>
+          "floating-point types.)" ]
+        [ "Int", Ptr t, "Int", Ptr t, "Int", Ptr t ] "()"
+        [ printf "= C.%srotm" abbr ]
+
+      ]
+    , Group "Basic operations" $ Elem <$>
+
+      [ function "swap" Numeric
+        [ "Swap two vectors:"
+        , "> (x, y) ← (y, x)" ]
+        [ "Int", Ptr t, "Int", Ptr t, "Int" ] "()"
+        [ printf "= C.%sswap" abbr ]
+
+      , function "scal" Numeric
+        [ "Multiply a vector by a scalar."
+        , "> x ← α x" ]
+        [ "Int", Val t, Ptr t, "Int" ] "()"
+        (if real then [ printf "= C.%sscal" abbr ] else
+         [ printf "n (alpha :+ 0) = C.%s%sscal n alpha" abbr realAbbr
+         , printf "n alpha = C.%sscal n alpha" abbr ])
+
+      , function "copy" Numeric
+        [ "Copy a vector into another vector:"
+        , "> y ← x" ]
+        [ "Int", Ptr t, "Int", Ptr t, "Int" ] "()"
+        [ printf "= C.%scopy" abbr ]
+
+      , function "axpy" Numeric
+        [ "Add a scalar-vector product to a vector."
+        , "> y ← α x + y" ]
+        [ "Int", Val t, Ptr t, "Int", Ptr t, "Int" ] "()"
+        [ printf "= C.%saxpy" abbr ]
+
+      , function "dotu" Numeric
+        [ "Calculate the bilinear dot product of two vectors:"
+        , "> x ⋅ y ≡ ∑[i] x[i] y[i]" ]
+        [ "Int", Ptr t, "Int", Ptr t, "Int" ] (Val t)
+        [ printf (if real then "= C.%sdot" else
+                  "a b c d e = getReturnValue (C.%sdotu_sub a b c d e)") abbr ]
+
+      , function "dotc" Numeric
+        [ "Calculate the sesquilinear dot product of two vectors."
+        , "> x* ⋅ y ≡ ∑[i] x[i]* y[i]" ]
+        [ "Int", Ptr t, "Int", Ptr t, "Int" ] (Val t)
+        [ printf (if real then "= C.%sdot" else
+                  "a b c d e = getReturnValue (C.%sdotc_sub a b c d e)") abbr ]
+
+      , function "sdsdot" (Unique Float)
+        [ "Calculate the dot product of two vectors with extended " <>
+          "precision accumulation of the intermediate results and add a " <>
+          "scalar value to the result.  (Only available for the " <>
+          "@'Float'@ type.)" ]
+        [ "Int", Val t, Ptr t, "Int", Ptr t, "Int" ] (Val t)
+        [ "= C.sdsdot" ]
+
+      , function "dsdot" (Unique Double)
+        [ "Calculate the dot product of two vectors with extended " <>
+          "precision accumulation of the intermediate results and return " <>
+          "a double-precision result.  (Only available in the @Double@ " <>
+          "module.)" ]
+        [ "Int", Ptr (fromNumType Float), "Int", Ptr (fromNumType Float)
+        , "Int" ] (Val t)
+        [ "= C.dsdot" ]
+
+      ]
+    , Group "Norm operations" $ Elem <$>
+
+      [ function "nrm2" Numeric
+        [ "Calculate the Euclidean (L²) norm of a vector:"
+        , "> ‖x‖₂ ≡ √(∑[i] x[i]²)" ]
+        [ "Int", Ptr t, "Int" ] (Val realT)
+        [ printf "= C.%s%snrm2" optRealAbbr abbr ]
+
+      , function "asum" Numeric
+        [ "Calculate the Manhattan (L¹) norm, equal to the sum of the " <>
+          "magnitudes of the elements:"
+        , "> ‖x‖₁ = ∑[i] |x[i]|" ]
+        [ "Int", Ptr t, "Int" ] (Val realT)
+        [ printf "= C.%s%sasum" optRealAbbr abbr ]
+
+      , function "iamax" Numeric
+        [ "Calculate the index of the element with the maximum magnitude " <>
+          "(absolute value)." ]
+        [ "Int", Ptr t, "Int" ] "Int"
+        [ printf "= C.i%samax" abbr ]
+
+      ]
+    ]
+  , Group "Level 2: matrix-vector operations"
+    [ Group "Multiplication" $ Elem <$>
+
+      [ function "gemv" Numeric
+        [ "Perform a general matrix-vector update."
+        , "> y ← α T(A) x + β y" ]
+        [ "Order", "Transpose", "Int", "Int", Val t, Ptr t, "Int", Ptr t
+        , "Int", Val t, Ptr t, "Int" ] "()"
+        [ printf "= C.%sgemv" abbr ]
+
+      , function "gbmv" Numeric
+        [ "Perform a general banded matrix-vector update."
+        , "> y ← α T(A) x + β y" ]
+        [ "Order", "Transpose", "Int", "Int", "Int", "Int", Val t, Ptr t
+        , "Int", Ptr t, "Int", Val t, Ptr t, "Int" ] "()"
+        [ printf "= C.%sgbmv" abbr ]
+
+      , function "hemv" Numeric
+        [ "Perform a hermitian matrix-vector update."
+        , "> y ← α A x + β y" ]
+        [ "Order", "Uplo", "Int", Val t, Ptr t, "Int", Ptr t, "Int", Val t
+        , Ptr t, "Int" ] "()"
+        [ printf "= C.%s%smv" abbr syOrHe ]
+
+      , function "hbmv" Numeric
+        [ "Perform a hermitian banded matrix-vector update."
+        , "> y ← α A x + β y" ]
+        [ "Order", "Uplo", "Int", "Int", Val t, Ptr t, "Int", Ptr t, "Int"
+        , Val t, Ptr t, "Int" ] "()"
+        [ printf "= C.%s%cbmv" abbr (head syOrHe) ]
+
+      , function "hpmv" Numeric
+        [ "Perform a hermitian packed matrix-vector update."
+        , "> y ← α A x + β y" ]
+        [ "Order", "Uplo", "Int", Val t, Ptr t, Ptr t, "Int", Val t, Ptr t
+        , "Int" ] "()"
+        [ printf "= C.%s%cpmv" abbr (head syOrHe) ]
+
+      ]
+    , Group "Triangular operations" $ Elem <$>
+
+      [ function "trmv" Numeric
+        [ "Multiply a triangular matrix by a vector."
+        , "> x ← T(A) x" ]
+        [ "Order", "Uplo", "Transpose", "Diag", "Int", Ptr t, "Int", Ptr t
+        , "Int" ] "()"
+        [ printf "= C.%strmv" abbr ]
+
+      , function "tbmv" Numeric
+        [ "Multiply a triangular banded matrix by a vector."
+        , "> x ← T(A) x" ]
+        [ "Order", "Uplo", "Transpose", "Diag", "Int", "Int", Ptr t, "Int"
+        , Ptr t, "Int" ] "()"
+        [ printf "= C.%stbmv" abbr ]
+
+      , function "tpmv" Numeric
+        [ "Multiply a triangular packed matrix by a vector."
+        , "> x ← T(A) x" ]
+        [ "Order", "Uplo", "Transpose", "Diag", "Int", Ptr t, Ptr t
+        , "Int" ] "()"
+        [ printf "= C.%stpmv" abbr ]
+
+      , function "trsv" Numeric
+        [ "Multiply an inverse triangular matrix by a vector."
+        , "> x ← T(A⁻¹) x" ]
+        [ "Order", "Uplo", "Transpose", "Diag", "Int", Ptr t, "Int", Ptr t
+        , "Int" ] "()"
+        [ printf "= C.%strsv" abbr ]
+
+      , function "tbsv" Numeric
+        [ "Multiply an inverse triangular banded matrix by a vector."
+        , "> x ← T(A⁻¹) x" ]
+        [ "Order", "Uplo", "Transpose", "Diag", "Int", "Int", Ptr t, "Int"
+        , Ptr t, "Int" ] "()"
+        [ printf "= C.%stbsv" abbr ]
+
+      , function "tpsv" Numeric
+        [ "Multiply an inverse triangular packed matrix by a vector."
+        , "> x ← T(A⁻¹) x" ]
+        [ "Order", "Uplo", "Transpose", "Diag", "Int", Ptr t, Ptr t
+        , "Int" ] "()"
+        [ printf "= C.%stpsv" abbr ]
+
+      ]
+    , Group "Rank updates" $ Elem <$>
+
+      [ function "geru" Numeric
+        [ "Perform an unconjugated rank-1 update of a general matrix."
+        , "> A ← α x y⊤ + A" ]
+        [ "Order", "Int", "Int", Val t, Ptr t, "Int", Ptr t, "Int", Ptr t
+        , "Int" ] "()"
+        [ printf "= C.%sger%s" abbr (if real then "" else "u" :: String) ]
+
+      , function "gerc" Numeric
+        [ "Perform a conjugated rank-1 update of a general matrix."
+        , "> A ← α x y† + A" ]
+        [ "Order", "Int", "Int", Val t, Ptr t, "Int", Ptr t, "Int", Ptr t
+        , "Int" ] "()"
+        [ printf "= C.%sger%s" abbr (if real then "" else "c" :: String) ]
+
+      , function "her" Numeric
+        [ "Perform a rank-1 update of a Hermitian matrix."
+        , "> A ← α x y† + A" ]
+        [ "Order", "Uplo", "Int", Val realT, Ptr t, "Int", Ptr t, "Int" ] "()"
+        [ printf "= C.%s%sr" abbr syOrHe ]
+
+      , function "hpr" Numeric
+        [ "Perform a rank-1 update of a Hermitian packed matrix."
+        , "> A ← α x y† + A" ]
+        [ "Order", "Uplo", "Int", Val realT, Ptr t, "Int", Ptr t ] "()"
+        [ printf "= C.%s%cpr" abbr (head syOrHe) ]
+
+      , function "her2" Numeric
+        [ "Perform a rank-2 update of a Hermitian matrix."
+        , "> A ← α x y† + y (α x)† + A" ]
+        [ "Order", "Uplo", "Int", Val t, Ptr t, "Int", Ptr t, "Int", Ptr t
+        , "Int" ] "()"
+        [ printf "= C.%s%sr2" abbr syOrHe ]
+
+      , function "hpr2" Numeric
+        [ "Perform a rank-2 update of a Hermitian packed matrix."
+        , "> A ← α x y† + y (α x)† + A" ]
+        [ "Order", "Uplo", "Int", Val t, Ptr t, "Int", Ptr t, "Int"
+        , Ptr t ] "()"
+        [ printf "= C.%s%cpr2" abbr (head syOrHe) ]
+
+      ]
+    ]
+  , Group "Level 3: matrix-matrix operations"
+
+    [ Group "Multiplication" $ Elem <$>
+
+      [ Function "gemm" Numeric
+        [ "Perform a general matrix-matrix update."
+        , "> C ← α T(A) U(B) + β C" ]
+        [ ("Order", "Layout of all the matrices.")
+        , ("Transpose", "The operation @T@ to be applied to @A@.")
+        , ("Transpose", "The operation @U@ to be applied to @B@.")
+        , ("Int", "Number of rows of @T(A)@ and @C@.")
+        , ("Int", "Number of columns of @U(B)@ and @C@.")
+        , ("Int", "Number of columns of @T(A)@ and number of rows of @U(B)@.")
+        , (Val t, "Scaling factor @α@ of the product.")
+        , (Ptr t, "Pointer to a matrix @A@.")
+        , ("Int", "Stride of the major dimension of @A@.")
+        , (Ptr t, "Pointer to a matrix @B@.")
+        , ("Int", "Stride of the major dimension of @B@.")
+        , (Val t, "Scaling factor @β@ of the original @C@.")
+        , (Ptr t, "Pointer to a mutable matrix @C@.")
+        , ("Int", "Stride of the major dimension of @C@.")
+        ] "()"
+        [ printf "= C.%sgemm" abbr ]
+
+      , Function "symm" Numeric
+        [ "Perform a symmetric matrix-matrix update."
+        , "> C ← α A B + β C    or    C ← α B A + β C"
+        , "where @A@ is symmetric.  The matrix @A@ must be in an unpacked " <>
+          "format, although the routine will only access half of it as " <>
+          "specified by the @'Uplo'@ argument." ]
+        [ ("Order", "Layout of all the matrices.")
+        , ("Side", "Side that @A@ appears in the product.")
+        , ("Uplo", "The part of @A@ that is used.")
+        , ("Int", "Number of rows of @C@.")
+        , ("Int", "Number of columns of @C@.")
+        , (Val t, "Scaling factor @α@ of the product.")
+        , (Ptr t, "Pointer to a symmetric matrix @A@.")
+        , ("Int", "Stride of the major dimension of @A@.")
+        , (Ptr t, "Pointer to a matrix @B@.")
+        , ("Int", "Stride of the major dimension of @B@.")
+        , (Val t, "Scaling factor @α@ of the original @C@.")
+        , (Ptr t, "Pointer to a mutable matrix @C@.")
+        , ("Int", "Stride of the major dimension of @C@.")
+        ] "()"
+        [ printf "= C.%ssymm" abbr ]
+
+      , Function "hemm" Numeric
+        [ "Perform a Hermitian matrix-matrix update."
+        , "> C ← α A B + β C    or    C ← α B A + β C"
+        , "where @A@ is Hermitian.  The matrix @A@ must be in an unpacked " <>
+          "format, although the routine will only access half of it as " <>
+          "specified by the @'Uplo'@ argument." ]
+        [ ("Order", "Layout of all the matrices.")
+        , ("Side", "Side that @A@ appears in the product.")
+        , ("Uplo", "The part of @A@ that is used.")
+        , ("Int", "Number of rows of @C@.")
+        , ("Int", "Number of columns of @C@.")
+        , (Val t, "Scaling factor @α@ of the product.")
+        , (Ptr t, "Pointer to a Hermitian matrix @A@.")
+        , ("Int", "Stride of the major dimension of @A@.")
+        , (Ptr t, "Pointer to a matrix @B@.")
+        , ("Int", "Stride of the major dimension of @B@.")
+        , (Val t, "Scaling factor @α@ of the original @C@.")
+        , (Ptr t, "Pointer to a mutable matrix @C@.")
+        , ("Int", "Stride of the major dimension of @C@.")
+        ] "()"
+        [ printf "= C.%s%smm" abbr syOrHe ]
+
+      ]
+    , Group "Rank updates" $ Elem <$>
+
+      [ function "syrk" Numeric
+        [ "Perform a symmetric rank-k update."
+        , "> C ← α A A⊤ + β C    or    C ← α A⊤ A + β C" ]
+        [ "Order", "Uplo", "Transpose", "Int", "Int", Val t, Ptr t, "Int"
+        , Val t, Ptr t, "Int" ] "()"
+        [ printf "= C.%ssyrk" abbr ]
+
+      , function "herk" Numeric
+        [ "Perform a Hermitian rank-k update."
+        , "> C ← α A A† + β C    or    C ← α A† A + β C" ]
+        [ "Order", "Uplo", "Transpose", "Int", "Int", Val realT, Ptr t, "Int"
+        , Val realT, Ptr t, "Int" ] "()"
+        [ printf "= C.%s%srk" abbr syOrHe ]
+
+      , function "syr2k" Numeric
+        [ "Perform a symmetric rank-2k update."
+        , "> C ← α A B⊤ + α* B A⊤ + β C    or    C ← α A⊤ B + α* B⊤ A + β C" ]
+        [ "Order", "Uplo", "Transpose", "Int", "Int", Val t, Ptr t, "Int"
+        , Ptr t, "Int", Val t, Ptr t, "Int" ] "()"
+        [ printf "= C.%ssyr2k" abbr ]
+
+      , function "her2k" Numeric
+        [ "Perform a Hermitian rank-2k update."
+        , "> C ← α A B† + α* B A† + β C    or    C ← α A† B + α* B† A + β C" ]
+        [ "Order", "Uplo", "Transpose", "Int", "Int", Val t, Ptr t, "Int"
+        , Ptr t, "Int", Val realT, Ptr t, "Int" ] "()"
+        [ printf "= C.%s%sr2k" abbr syOrHe ]
+
+      ]
+    , Group "Triangular operations" $ Elem <$>
+
+      [ function "trmm" Numeric
+        [ "Perform a triangular matrix-matrix multiplication."
+        , "> B ← α T(A) B    or    B ← α B T(A)"
+        , "where @A@ is triangular." ]
+        [ "Order", "Side", "Uplo", "Transpose", "Diag", "Int", "Int", Val t
+        , Ptr t, "Int", Ptr t, "Int" ] "()"
+        [ printf "= C.%strmm" abbr ]
+
+      , function "trsm" Numeric
+        [ "Perform an inverse triangular matrix-matrix multiplication."
+        , "> B ← α T(A⁻¹) B    or    B ← α B T(A⁻¹)"
+        , "where @A@ is triangular." ]
+        [ "Order", "Side", "Uplo", "Transpose", "Diag", "Int", "Int", Val t
+        , Ptr t, "Int", Ptr t, "Int" ] "()"
+        [ printf "= C.%strsm" abbr ]
+
+      ]
+    ]
+  ]
+  where abbr               = abbrev     t
+        realAbbr           = abbrev realT
+        real               = isReal     t
+        realT              = realType   t
+        optRealAbbr | real = ""
+                    | True = realAbbr
+        syOrHe            :: String
+        syOrHe      | real = "sy"
+                    | True = "he"
+        -- similar to 'Function' but without documentation for args
+        function name dom doc arg ret def = Function name dom doc arg' ret def
+          where arg' = [ (x, "") | x <- arg ]

@@ -3,46 +3,395 @@
 --
 -- Generates a low-level FFI interface to CBlas using c2hs.
 --
-{-# LANGUAGE NoMonomorphismRestriction #-}
-module Main where
-import Data.List (intercalate)
-import Text.Printf (printf)
-import Defs
+module Main (main) where
+import Common
 
 main :: IO ()
-main = do
-  let dir = "../src/Blas/Primitive"
-  writeFile (dir ++ "/Safe.chs.tmp")   $ ffiFuncModule funInsts
-  writeFile (dir ++ "/Unsafe.chs.tmp") $ ffiFuncModule funInstsUnsafe
+main = forM_ [minBound .. maxBound] $ \ safety ->
+  let docs = [ "Stability: Stable"
+             , "Foreign function interface to Blas.  These functions use " <>
+               (toLower <$> show safety) <> " foreign calls.  Refer to the " <>
+               "GHC documentation for more information regarding " <>
+               "appropriate use of safe and unsafe foreign calls." ]
+      name = [ "Blas", "Primitive", show safety ]
+      imps = [ "Prelude hiding (Either(Left, Right))"
+             , "Data.Complex (Complex)"
+             , "Foreign (Ptr, castPtr)"
+             , "Foreign.C.Types"
+             , "Foreign.Storable.Complex ()"
+             , "Blas.Primitive.Types"
+             , "BlasCTypes"
+             , "FFI" ]
+      fis  = funInstsBySafety safety
+      exps = [ intercalate ", " (fmap cfName fis) ]
+      body = "#include <cblas.h>\n\n" <>
+             intercalate "\n\n" (fmap mkFun  fis)
+  -- trailing underscore to prevent Cabal from running c2hs on them
+  in writeModule "_.chs" exts name docs exps imps body prefix
+  where prefix = "../src/"
+        exts = [ "ForeignFunctionInterface" ]
 
-ffiModule exports contents =
-  rubyVars $
-  [ ("exports",  intercalate ", "   exports)
-  , ("contents", intercalate "\n\n" contents) ]
-
-ffiEnumModule enums = ffiModule (fmap (++ "(..)") enums) (fmap mkEnum enums)
-ffiFuncModule funcs = ffiModule (fmap cfName funcs)      (fmap mkFun funcs)
-
--- | Convert a set of global Ruby variables into a string.
---   Note: the values are not escaped.
-rubyVars :: [(String, String)] -> String
-rubyVars = intercalate "\n\n" . (fmap $ uncurry $ printf "$%s = %%[%s]\n")
-
--- | Generates a c2hs hook for the enumeration.
-mkEnum :: String -> String
-mkEnum name =
-  printf ("{# enum %s as %s {} with prefix = \"%s\"%s #}")
-         (enumMangler name) name enumValuePrefix derivings
-  where derivings = " deriving (Bounded, Eq, Ord, Read, Show)"
+funInstsBySafety :: Safety -> [CFun]
+funInstsBySafety Safe   = funInsts
+funInstsBySafety Unsafe = funInstsUnsafe
 
 -- | Generates a c2hs hook for the function.
 mkFun :: CFun -> String
 mkFun (CFun safe name params ret doc) =
-  (if null doc then "" else "-- | " ++ doc) ++
+  (if null doc then "" else "-- | " <> doc) <>
   printf "{# fun%s %s%s { %s } -> %s #}"
          safe' cName hName params' ret'
   where cName   = funMangler name
-        hName   = if name == cName then "" else " as " ++ name
+        hName   = if name == cName then "" else " as " <> name
         safe'   = if safe then "" else " unsafe"
         params' = intercalate ", " $ fmap (mkParamType . convType) params
         ret'    = mkRetType $ convType ret
+
+-- | Represents a C type.
+data Type
+  = TVoid
+  | TPtr Type
+  | TSize
+  | TFloat
+  | TDouble
+  | TComplex Type
+  | TEnum String
+  | TDummy Int                    -- ^ Used for extracting the bound variables
+  deriving (Eq, Show)
+
+realTypes :: [Type]
+realTypes = [ float, double ]
+
+complexTypes :: [Type]
+complexTypes = complex <$> realTypes
+
+floatingTypes :: [Type]
+floatingTypes = realTypes <> complexTypes
+
+floatingTypesB :: [(Type, Type)]
+floatingTypesB = do
+  t <- floatingTypes
+  return $ case t of
+    TComplex t' -> (t', t)
+    _           -> (t,  t)
+
+floatingTypesE :: [(Type, Type)]
+floatingTypesE = do
+  t <- floatingTypes
+  case t of
+    TComplex t' -> [(t, t), (t, t')]
+    _           -> return (t, t)
+
+-- | Represents a C function.
+data Fun
+  = Fun
+    { fName  :: String
+    , fTypes :: [Type]
+    , _fDoc  :: String
+    }
+
+-- | Construct a 'Fun'.
+fun :: String -> [Type] -> Fun
+fun name types = Fun name types ""
+
+-- | Represents a marshallable C type for c2hs.
+data HType = HType
+             String                     -- in marshaller
+             String                     -- type
+             String                     -- out marshaller
+             deriving Show
+
+mkParamType :: HType -> String
+mkParamType (HType m s _) =
+  if null m then s' else m <> " " <> s'
+  where s' = "`" <> s <> "'"
+
+mkRetType :: HType -> String
+mkRetType (HType _ s m) =
+  if null m then s' else s' <> " " <> m
+  where s' = "`" <> s <> "'"
+
+-- | Represents a C function hook for c2hs.
+data CFun
+  = CFun
+    { cfSafe    :: Bool
+    , cfName    :: String
+    , _cfParams :: [Type]
+    , _cfRet    :: Type
+    , cfDoc     :: String
+    }
+
+  -- | Construct a 'CFun'.
+cFun :: String -> [Type] -> Type -> CFun
+cFun name params ret = CFun True name params ret ""
+
+unreturnable :: Type -> Bool
+unreturnable t = case t of
+  TComplex TFloat  -> True
+  TComplex TDouble -> True
+  _                -> False
+
+substitute :: String -> String -> String
+substitute s y = case y of
+  []     -> []
+  x : xs ->
+    let xs' = substitute s xs in
+    case x of
+      '?' -> s <> xs'
+      _   -> x : xs'
+
+typeAbbrev :: Type -> String
+typeAbbrev t = case t of
+  TFloat           -> "s"
+  TDouble          -> "d"
+  TComplex TFloat  -> "c"
+  TComplex TDouble -> "z"
+  _                -> error ("no valid abbreviation for: " <> show t)
+
+decorate :: [Type] -> String -> String
+decorate [a]                = substitute $ typeAbbrev a
+decorate [a, b] | a == b    = substitute $ typeAbbrev a
+                | otherwise = substitute $ typeAbbrev a <> typeAbbrev b
+decorate _                  = error "decorate: bad args"
+
+-- note: here we assume that both the C and Haskell types have identical
+-- representations; this isn't in the specs but in practice the Storable
+-- instances are identical so it should work fine
+convType :: Type -> HType
+convType t = case t of
+  TVoid            -> simple "()"
+  TSize            -> simple "Int"
+  TEnum t'         -> enum t'
+  TFloat           -> floating "Float"
+  TDouble          -> floating "Double"
+  TComplex TFloat  -> complex_ "Complex Float"
+  TComplex TDouble -> complex_ "Complex Double"
+  TPtr t'          -> pointer $ case t' of
+    TFloat           -> "Float"
+    TDouble          -> "Double"
+    TComplex TFloat  -> "(Complex Float)"
+    TComplex TDouble -> "(Complex Double)"
+    _                -> error $ "unmarshallable type: " <> show t
+  _                -> error $ "unmarshallable type: " <> show t
+  where floating s = HType ("C" <> s) s ("fromC" <> s)
+        complex_ s = HType "withVoidPtr*" s ""
+        pointer  s = HType "castPtr" ("Ptr " <> s) "castPtr"
+        enum     s = HType "toCEnum" s "fromCEnum"
+        simple   s = HType "" s ""
+
+-- shortcuts
+
+void :: Type
+void = TVoid
+
+ptr :: Type -> Type
+ptr = TPtr
+
+int :: Type
+int = TSize
+
+float :: Type
+float = TFloat
+
+double :: Type
+double = TDouble
+
+complex :: Type -> Type
+complex = TComplex
+
+index :: Type
+index = TSize
+
+order :: Type
+order = TEnum "Order"
+
+transpose :: Type
+transpose = TEnum "Transpose"
+
+uplo :: Type
+uplo = TEnum "Uplo"
+
+diag :: Type
+diag = TEnum "Diag"
+
+side :: Type
+side = TEnum "Side"
+
+funInstsUnsafe :: [CFun]
+funInstsUnsafe = [ x { cfSafe = False } | x <- funInsts ]
+
+funInsts :: [CFun]
+funInsts = mangleFun <$> concatFunInstances funs
+
+-- | Blas function signatures.
+funs :: [FunGroup]
+funs =
+  [ gp $ fun "sdsdot" [ int, float, ptr float, int, ptr float, int, float ]
+  , gp $ fun  "dsdot" [ int, ptr float, int, ptr float, int, double ]
+  , gpR $ \ a   -> fun "?dot"   [ int, ptr a, int, ptr a, int, a ]
+  , gpC $ \ a   -> fun "?dotu"  [ int, ptr a, int, ptr a, int, a ]
+  , gpC $ \ a   -> fun "?dotc"  [ int, ptr a, int, ptr a, int, a ]
+  , gpB $ \ a b -> fun "?nrm2"  [ int, ptr b, int, a ]
+  , gpB $ \ a b -> fun "?asum"  [ int, ptr b, int, a ]
+  , gpA $ \ a   -> fun "i?amax" [ int, ptr a, int, index ]
+  , gpA $ \ a   -> fun "?swap"  [ int, ptr a, int, ptr a, int, void ]
+  , gpA $ \ a   -> fun "?copy"  [ int, ptr a, int, ptr a, int, void ]
+  , gpA $ \ a   -> fun "?axpy"  [ int, a, ptr a, int, ptr a, int, void ]
+  , gpR $ \ a   -> fun "?rotg"  [ ptr a, ptr a, ptr a, ptr a, void ]
+  , gpR $ \ a   -> fun "?rotmg" [ ptr a, ptr a, ptr a, a, ptr a, void ]
+  , gpR $ \ a   -> fun "?rot"   [ int, ptr a, int, ptr a, int, a, a, void ]
+  , gpR $ \ a   -> fun "?rotm"  [ int, ptr a, int, ptr a, int, ptr a, void ]
+  , gpE $ \ a b -> fun "?scal"  [ int, b, ptr a, int, void ]
+  , gpA $ \ a   -> fun "?gemv"  [ order, transpose, int, int, a, ptr a
+                                , int, ptr a, int, a, ptr a, int, void ]
+  , gpA $ \ a   -> fun "?gbmv"  [ order, transpose, int, int, int, int, a
+                                , ptr a, int, ptr a, int, a, ptr a, int, void ]
+  , gpA $ \ a   -> fun "?trmv"  [ order, uplo, transpose, diag, int
+                                , ptr a, int, ptr a, int, void ]
+  , gpA $ \ a   -> fun "?tbmv"  [ order, uplo, transpose, diag, int, int
+                                , ptr a, int, ptr a, int, void ]
+  , gpA $ \ a   -> fun "?tpmv"  [ order, uplo, transpose, diag, int
+                                , ptr a, ptr a, int, void ]
+  , gpA $ \ a   -> fun "?trsv"  [ order, uplo, transpose, diag, int
+                                , ptr a, int, ptr a, int, void ]
+  , gpA $ \ a   -> fun "?tbsv"  [ order, uplo, transpose, diag, int, int
+                                , ptr a, int, ptr a, int, void ]
+  , gpA $ \ a   -> fun "?tpsv"  [ order, uplo, transpose, diag, int
+                                , ptr a, ptr a, int, void ]
+  , gpR $ \ a   -> fun "?symv"  [ order, uplo, int, a, ptr a, int, ptr a, int
+                                , a, ptr a, int, void ]
+  , gpR $ \ a   -> fun "?sbmv"  [ order, uplo, int, int, a, ptr a, int, ptr a
+                                , int, a, ptr a, int, void ]
+  , gpR $ \ a   -> fun "?spmv"  [ order, uplo, int, a, ptr a, ptr a, int, a
+                                , ptr a, int, void ]
+  , gpR $ \ a   -> fun "?ger"   [ order, int, int, a, ptr a, int, ptr a
+                                , int, ptr a, int, void ]
+  , gpR $ \ a   -> fun "?syr"   [ order, uplo, int, a, ptr a, int, ptr a
+                                , int, void ]
+  , gpR $ \ a   -> fun "?syr2"  [ order, uplo, int, a, ptr a, int, ptr a
+                                , int, ptr a, int, void ]
+  , gpR $ \ a   -> fun "?spr"   [ order, uplo, int, a, ptr a
+                                , int, ptr a, void ]
+  , gpR $ \ a   -> fun "?spr2"  [ order, uplo, int, a, ptr a, int, ptr a
+                                , int, ptr a, void ]
+  , gpC $ \ a   -> fun "?hemv"  [ order, uplo, int, a, ptr a, int, ptr a
+                                , int, a, ptr a, int, void ]
+  , gpC $ \ a   -> fun "?hbmv"  [ order, uplo, int, int, a, ptr a
+                                , int, ptr a, int, a, ptr a, int, void ]
+  , gpC $ \ a   -> fun "?hpmv"  [ order, uplo, int, a, ptr a, ptr a
+                                , int, a, ptr a, int, void ]
+  , gpC $ \ a   -> fun "?geru"  [ order, int, int, a, ptr a, int
+                                , ptr a , int, ptr a, int, void ]
+  , gpC $ \ a   -> fun "?gerc"  [ order, int, int, a, ptr a, int
+                                , ptr a, int, ptr a, int, void ]
+  , gpQ $ \ a   -> fun "?her"   [ order, uplo, int, a, ptr (complex a), int
+                                , ptr (complex a), int, void ]
+  , gpQ $ \ a   -> fun "?hpr"   [ order, uplo, int, a, ptr (complex a), int
+                                , ptr (complex a), void ]
+  , gpC $ \ a   -> fun "?her2"  [ order, uplo, int, a, ptr a, int
+                                , ptr a, int, ptr a, int, void ]
+  , gpC $ \ a   -> fun "?hpr2"  [ order, uplo, int, a, ptr a, int
+                                , ptr a, int, ptr a, void ]
+  , gpA $ \ a   -> fun "?gemm"  [ order, transpose, transpose, int, int, int, a
+                                , ptr a, int, ptr a, int, a, ptr a, int, void ]
+  , gpA $ \ a   -> fun "?symm"  [ order, side, uplo, int, int, a, ptr a, int
+                                , ptr a, int, a, ptr a, int, void ]
+  , gpA $ \ a   -> fun "?syrk"  [ order, uplo, transpose, int, int, a, ptr a
+                                , int, a, ptr a, int, void ]
+  , gpA $ \ a   -> fun "?syr2k" [ order, uplo, transpose, int, int, a, ptr a
+                                , int, ptr a, int, a, ptr a, int, void ]
+  , gpC $ \ a   -> fun "?hemm"  [ order, side, uplo, int, int, a, ptr a, int
+                                , ptr a, int, a, ptr a, int, void ]
+  , gpQ $ \ a   -> fun "?herk"  [ order, uplo, transpose, int, int, a
+                                , ptr (complex a), int, a
+                                , ptr (complex a), int, void ]
+  , gpQ $ \ a   -> fun "?her2k" [ order, uplo, transpose, int, int, complex a
+                                , ptr (complex a), int, ptr (complex a)
+                                , int, a, ptr (complex a), int, void ]
+  , gpA $ \ a   -> fun "?trmm"  [ order, side, uplo, transpose, diag, int, int
+                                , a, ptr a, int, ptr a, int, void ]
+  , gpA $ \ a   -> fun "?trsm"  [ order, side, uplo, transpose, diag, int, int
+                                , a, ptr a, int, ptr a, int, void ]
+  ]
+
+data FunGroup
+  = FunGroup
+    { _gpName :: String
+    , _gpType :: [Type]
+    , gpInsts :: [FunInstance]
+    }
+
+gp :: Fun -> FunGroup
+gp f = FunGroup (fName f) (fTypes f) [FunInstance [] f]
+
+-- | Function group over @s d c z@.
+gpA :: (Type -> Fun) -> FunGroup
+gpA = makeFunGroup1 decorate floatingTypes
+
+-- | Function group over @s d@.
+gpR :: (Type -> Fun) -> FunGroup
+gpR = makeFunGroup1 decorate realTypes
+
+-- | Function group over @s d@ but relabel them as @c z@.
+gpQ :: (Type -> Fun) -> FunGroup
+gpQ = makeFunGroup1 (decorate . (complex <$>)) realTypes
+
+-- | Function group over @c z@.
+gpC :: (Type -> Fun) -> FunGroup
+gpC = makeFunGroup1 decorate complexTypes
+
+-- | Function group over @ss dd sc dz@.
+gpB :: (Type -> Type -> Fun) -> FunGroup
+gpB = makeFunGroup2 decorate floatingTypesB
+
+-- | Function group over @ss dd cc zz cs zd@.
+gpE :: (Type -> Type -> Fun) -> FunGroup
+gpE = makeFunGroup2 decorate floatingTypesE
+
+makeFunGroup1 :: ([Type] -> String -> String)
+              -> [Type]
+              -> (Type -> Fun)
+              -> FunGroup
+makeFunGroup1 d ts ff = makeFunGroup 1 d ts' ff'
+  where ts'      = [ [a] | a <- ts ]
+        ff' args = ff a   where [a]    = args
+
+makeFunGroup2 :: ([Type] -> String -> String)
+              -> [(Type, Type)]
+              -> (Type -> Type -> Fun)
+              -> FunGroup
+makeFunGroup2 d ts ff = makeFunGroup 2 d ts' ff'
+  where ts'      = [ [a, b] | (a, b) <- ts ]
+        ff' args = ff a b where [a, b] = args
+
+makeFunGroup :: Int
+             -> ([Type] -> String -> String)
+             -> [[Type]]
+             -> ([Type] -> Fun)
+             -> FunGroup
+makeFunGroup n decorator ts ff =
+  let f = ff (take n (TDummy <$> [0 ..])) in
+  FunGroup (substitute "" $ fName f) (fTypes f) $ do
+    t <- ts
+    let f' = ff t
+    return $ FunInstance t (f' { fName = decorator t $ fName f'})
+
+data FunInstance
+  = FunInstance
+    { _fiArgs :: [Type]
+    , fiFun   :: Fun
+    }
+
+concatFunInstances :: [FunGroup] -> [Fun]
+concatFunInstances = (>>= (>>= return . fiFun) . gpInsts)
+
+funMangler :: String -> String
+funMangler = ("cblas_" <>)
+
+mangleFun :: Fun -> CFun
+mangleFun (Fun name types doc) = (\ x -> x { cfDoc = doc } ) $
+  if unreturnable ret -- some types must be returned via an out-parameter
+  then cFun (name <> "_sub") (params <> [ptr ret]) void
+  else cFun name params ret
+  where params = init types
+        ret    = last types
