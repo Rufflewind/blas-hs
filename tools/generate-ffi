@@ -14,7 +14,8 @@ main = forM_ [minBound .. maxBound] $ \ safety ->
                "GHC documentation for more information regarding " <>
                "appropriate use of safe and unsafe foreign calls." ]
       name = [ "Blas", "Primitive", show safety ]
-      imps = [ "Prelude hiding (Either(Left, Right))"
+      imps = [ "Prelude (Double, Float, Int, IO, fromIntegral, " <>
+               "($), (>>), (>>=), return)"
              , "Data.Complex (Complex)"
              , "Foreign (Ptr, castPtr)"
              , "Foreign.C.Types"

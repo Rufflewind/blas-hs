@@ -89,6 +89,7 @@ module Blas.Specialized.Double.Unsafe (
   , trmm
   , trsm
   ) where
+import Prelude (Double, Float, Int, IO)
 import Foreign (Ptr)
 import Blas.Primitive.Types (Order, Transpose, Uplo, Diag, Side)
 import qualified Blas.Primitive.Unsafe as C

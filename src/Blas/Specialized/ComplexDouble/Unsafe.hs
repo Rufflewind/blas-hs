@@ -83,6 +83,7 @@ module Blas.Specialized.ComplexDouble.Unsafe (
   , trmm
   , trsm
   ) where
+import Prelude (Double, Int, IO)
 import Foreign (Ptr)
 import Data.Complex (Complex((:+)))
 import FFI (getReturnValue)

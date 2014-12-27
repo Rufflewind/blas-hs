@@ -109,13 +109,18 @@ writeInterface interface safety = case interface of
     where name t = namePrefix <> [show interface, show t, show safety]
           docs   = moduleDocs safety <>
                    [ "/Since: 0.1.1/" ]
-          imps t = [ "Foreign (Ptr)" ] <>
-                      (if isReal t then [] else
-                         [ "Data.Complex (Complex((:+)))"
-                         , "FFI (getReturnValue)" ]) <>
-                      [ importTypes
-                      , printf "qualified Blas.Primitive.%s as C"
-                               (show safety) ]
+          imps t = [ printf "Prelude (%s, Int, IO)" (typs t)
+                   , "Foreign (Ptr)" ] <>
+                   (if isReal t then [] else
+                      [ "Data.Complex (Complex((:+)))"
+                      , "FFI (getReturnValue)" ]) <>
+                   [ importTypes
+                   , printf "qualified Blas.Primitive.%s as C" (show safety) ]
+          typs              :: NumType -> String
+          typs Float         = "Float"
+          typs Double        = "Double, Float"
+          typs ComplexFloat  = "Float"
+          typs ComplexDouble = "Double"
 
   Generic ->
     writeModule ".hs" exts name docs exps imps $
@@ -149,14 +154,16 @@ writeInterface interface safety = case interface of
           docs = moduleDocs safety
           exps = ("  " <>) <$> mapHeadTail ("  " <>) (", " <>)
                  [ "Numeric(..)", "RealNumeric(..)", "D.dsdot", "S.sdsdot" ]
-          imps = [ "Data.Complex (Complex)"
+          imps = [ "Prelude (Floating, Double, Float, Int, IO)"
+                 , "Data.Complex (Complex)"
                  , "Foreign (Ptr, Storable)"
                  , importTypes ] <>
                  [ printf "qualified Blas.Specialized.%s.%s as %s"
                    (show t) (show safety) (toUpper <$> abbrev t)
                  | t <- numTypes Numeric ]
 
-  where namePrefix = ["Blas"]
+namePrefix :: [String]
+namePrefix = ["Blas"]
 
 importTypes :: String
 importTypes = "Blas.Primitive.Types (Order, Transpose, Uplo, Diag, Side)"

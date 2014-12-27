@@ -40,6 +40,7 @@ module Blas.Generic.Unsafe (
   , D.dsdot
   , S.sdsdot
   ) where
+import Prelude (Floating, Double, Float, Int, IO)
 import Data.Complex (Complex)
 import Foreign (Ptr, Storable)
 import Blas.Primitive.Types (Order, Transpose, Uplo, Diag, Side)

@@ -1,5 +1,7 @@
 {-# OPTIONS_HADDOCK hide #-}
 module FFI where
+import Prelude (Enum, Integral, Num, Double, Float, IO, (.), (>>),
+                fromEnum, fromIntegral, toEnum)
 import Foreign (Ptr, Storable(peek), castPtr, with, alloca)
 import Foreign.C (CFloat(CFloat), CDouble(CDouble))
 
@@ -29,4 +31,4 @@ withVoidPtr x f = with x (f . castPtr)
 -- | Extract the return value via a pointer argument.
 --   Warning: make sure the only a one element is written.
 getReturnValue :: Storable a => (Ptr a -> IO ()) -> IO a
-getReturnValue f = alloca $ \ x -> f x >> peek x
+getReturnValue f = alloca (\ x -> f x >> peek x)

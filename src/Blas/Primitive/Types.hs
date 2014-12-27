@@ -1,18 +1,17 @@
-{-|
-
-Stability: experimental
-
-Enumerations used by the Blas interface.
-
--}
-module Blas.Primitive.Types
-       ( Order(..)
-       , Transpose(..)
-       , Uplo(..)
-       , Diag(..)
-       , Side(..)
-       ) where
-import Prelude hiding (Either(Left, Right))
+-- |
+--   Stability: Stable
+--
+--   Enumerations used by the Blas interface.
+module Blas.Primitive.Types (
+    Order(..)
+  , Transpose(..)
+  , Uplo(..)
+  , Diag(..)
+  , Side(..)
+  ) where
+import Prelude (Bounded, Enum(fromEnum, toEnum),
+                Eq, Ord, Read, Show, error, show)
+import Data.Monoid ((<>))
 import Data.Ix (Ix)
 
 -- | Memory layout of a matrix.
@@ -25,7 +24,7 @@ instance Enum Order where
   fromEnum ColMajor = 102
   toEnum 101 = RowMajor
   toEnum 102 = ColMajor
-  toEnum x   = error $ "Order.toEnum: Cannot match " ++ show x
+  toEnum x   = error ("Order.toEnum: Cannot match " <> show x)
 
 -- | Operation applied to a matrix.
 data Transpose = NoTrans                -- ^ No operation.
@@ -40,7 +39,7 @@ instance Enum Transpose where
   toEnum 111 = NoTrans
   toEnum 112 = Trans
   toEnum 113 = ConjTrans
-  toEnum x   = error $ "Transpose.toEnum: Cannot match " ++ show x
+  toEnum x   = error ("Transpose.toEnum: Cannot match " <> show x)
 
 -- | Specifies which triangular part of a matrix is used.
 data Uplo = Upper                       -- ^ Upper triangular part.
@@ -52,7 +51,7 @@ instance Enum Uplo where
   fromEnum Lower = 122
   toEnum 121 = Upper
   toEnum 122 = Lower
-  toEnum x   = error $ "Uplo.toEnum: Cannot match " ++ show x
+  toEnum x   = error ("Uplo.toEnum: Cannot match " <> show x)
 
 -- | Whether a matrix is unit triangular.
 data Diag = NonUnit                     -- ^ Not unit triangular.
@@ -64,7 +63,7 @@ instance Enum Diag where
   fromEnum Unit    = 132
   toEnum 131 = NonUnit
   toEnum 132 = Unit
-  toEnum x   = error $ "Diag.toEnum: Cannot match " ++ show x
+  toEnum x   = error ("Diag.toEnum: Cannot match " <> show x)
 
 -- | The side that a matrix appears in the product.
 data Side = Left                        -- ^ On the left side.
@@ -76,4 +75,4 @@ instance Enum Side where
   fromEnum Right = 142
   toEnum 141 = Left
   toEnum 142 = Right
-  toEnum x   = error $ "Side.toEnum: Cannot match " ++ show x
+  toEnum x   = error ("Side.toEnum: Cannot match " <> show x)

@@ -1,6 +1,7 @@
 {-# OPTIONS_HADDOCK hide #-}
 module BlasCTypes (BlasInt, BlasIndex) where
-import Foreign.C.Types
+import Prelude ()
+import Foreign.C.Types (CInt, CSize)
 
 -- Here, we define some aliases for the C types in case the Blas
 -- implementation decides to use some non-standard types.

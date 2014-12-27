@@ -82,6 +82,7 @@ module Blas.Specialized.ComplexFloat.Safe (
   , trmm
   , trsm
   ) where
+import Prelude (Float, Int, IO)
 import Foreign (Ptr)
 import Data.Complex (Complex((:+)))
 import FFI (getReturnValue)
