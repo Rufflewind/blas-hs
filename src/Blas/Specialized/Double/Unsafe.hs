@@ -12,7 +12,7 @@
 --   particular function, try looking for its corresponding complex equivalent (e.g.
 --   @symv@ is a special case of 'hemv' applied to real numbers).
 --
---   Note: although complex versions of 'rot' and 'rotg' exist in many implementations,
+--   Note: although complex versions of @rot@ and @rotg@ exist in many implementations,
 --   they are not part of the official Blas standard and therefore not included here.  If
 --   you /really/ need them, submit a ticket so we can try to come up with a solution.
 --
