@@ -1,5 +1,7 @@
 module TestUtils where
-import Control.Applicative (Applicative((<*>), pure))
+-- MonadFail was not part of Prelude until base-4.13.0.0
+import Control.Monad.Fail (MonadFail, fail)
+import Prelude hiding (MonadFail, fail)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
 import Text.Printf (printf)
@@ -34,6 +36,8 @@ instance Monad Test where
   Test f >>= u = Test $ \ s -> do
     (x, s') <- f s
     runTestM (u x) s'
+
+instance MonadFail Test where
   fail msg     = do
     failTest "aborted"
     liftIO (fail msg)

@@ -1,5 +1,5 @@
 name:                blas-hs
-version:             0.1.1.0
+version:             0.1.1.1
 synopsis:            Low-level Haskell bindings to Blas.
 description:
   This package provides a complete low-level binding to Blas via the foreign
@@ -62,9 +62,11 @@ library
                      , ForeignFunctionInterface
                      , TypeFamilies
   ghc-options:         -Wall
-  build-depends:       base >=4.5 && <5
-                       -- *** 4.5 === 4.8 ---
-                       -- 4.4 does not export constructors for CFloat et al
+  build-depends:       base >=4.9 && <5
+                       -- Requires 4.9.0.0 for MonadFail.
+                       -- Tested on 4.9.0.0 (Travis GHC 8.0.2).
+                       -- Tested on 4.13.0.0 (Travis GHC 8.8.1).
+                       -- Tested on 4.14.1.0 (local GHC 8.10.2).
                      , storable-complex >=0.2 && <1
                        -- *** 0.2 === 0.3 ---
                        -- 0.1 is buggy
