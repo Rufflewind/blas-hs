@@ -67,6 +67,7 @@ src/Blas/Primitive/blas.h:
 	curl >$@ -L http://netlib.org/clapack/CLAPACK-3.1.1.1/BLAS/WRAP/cblas.h
 
 src/Blas/Primitive/Safe.hs:                                 \
+    tools/post-process                                      \
     src/Blas/Primitive/blas.h                               \
     src/Blas/Primitive/Safe_.chs
 	c2hs blas.h src/Blas/Primitive/Safe_.chs
@@ -74,6 +75,7 @@ src/Blas/Primitive/Safe.hs:                                 \
 	mv src/Blas/Primitive/Safe_.hs src/Blas/Primitive/Safe.hs
 
 src/Blas/Primitive/Unsafe.hs:                               \
+    tools/post-process                                      \
     src/Blas/Primitive/blas.h                               \
     src/Blas/Primitive/Unsafe_.chs
 	c2hs blas.h src/Blas/Primitive/Unsafe_.chs

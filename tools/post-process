@@ -8,5 +8,5 @@ then
 fi
 
 sed -i 's/[ 	]\+$//' "$file"
-sed -i 's/CInt/BlasInt/g' "$file"
-sed -i 's/CULong/BlasIndex/g' "$file"
+sed -i 's/C2HSImp\.CInt/BlasInt/g' "$file"
+sed -i 's/C2HSImp\.CULong/BlasIndex/g' "$file"
