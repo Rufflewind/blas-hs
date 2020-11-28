@@ -105,6 +105,7 @@ test-suite test
   main-is:             MainTest.hs
   other-extensions:    Rank2Types
   other-modules:       TestUtils
+  ghc-options:         -Wall
   build-depends:       base
                      , blas-hs
 

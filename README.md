@@ -114,7 +114,7 @@ file.  First, you need to figure out which libraries to link to, as well as
 any additional options that need to be passed to the linker.  This usually
 comes as a set of command-line arguments.  For example,
 
-    -fopemp -L/usr/local/foobar/lib -lfoo -lbar
+    -fopenmp -L/usr/local/foobar/lib -lfoo -lbar
 
 The exact meaning of the flags can be found in the
 [manual of ld](https://sourceware.org/binutils/docs/ld/Options.html).  For our
