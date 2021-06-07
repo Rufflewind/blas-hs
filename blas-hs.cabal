@@ -17,8 +17,8 @@ maintainer:          rf@rufflewind.com
 copyright:           (c) 2014 Phil Ruffwind
 category:            Math
 build-type:          Simple
-cabal-version:       >=1.8
-                     -- *** 1.8 --- 1.14 === 1.21 ---
+cabal-version:       >=1.10
+                     -- *** 1.10 --- 1.14 === 1.21 ---
 
 source-repository head
   type:                git
@@ -70,6 +70,7 @@ library
                      , storable-complex >=0.2 && <1
                        -- *** 0.2 === 0.3 ---
                        -- 0.1 is buggy
+  default-language:    Haskell2010
 
   -- Both `extra-libraries` and `ld-options` control the linking of `blas-hs`
   -- with the existing Blas implementation (e.g. ACML, OpenBLAS, MKL).
@@ -112,3 +113,4 @@ test-suite test
                      , vector >=0.8 && <1
                        -- *** 0.8 === 0.11 ---
                        -- 0.7 has a different definition of MVector
+  default-language:    Haskell2010

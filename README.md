@@ -143,8 +143,8 @@ Now it's just a matter of modifying the package.
     cabal install -fno-netlib -fno-accelerate
     ```
 
-[ca]:  https://travis-ci.org/Rufflewind/blas-hs
-[ci]:  https://travis-ci.org/Rufflewind/blas-hs.svg?branch=master
+[ca]:  https://github.com/Rufflewind/blas-hs/actions/workflows/build.yml
+[ci]:  https://github.com/Rufflewind/blas-hs/actions/workflows/build.yml/badge.svg
 [ref]: http://netlib.org/blas
 [pvp]: https://gist.github.com/Rufflewind/03f4e03f7cfa52b8f07d
 [hac]: https://hackage.haskell.org/package/blas-hs
